@@ -34,10 +34,6 @@ Zapretify для Android построен на работе этих проек�
 - **[zapret](https://github.com/bol-van/zapret)** — bol-van, движок `nfqws`;
 - **[hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel)** — heiher, передача трафика из VPN в SOCKS5.
 
-Образцы Android-приложений, на опыт которых мы опираемся: **[ByeDPIAndroid](https://github.com/dovecoteescapee/ByeDPIAndroid)** (dovecoteescapee),
-**[ByeByeDPI](https://github.com/romanvht/ByeByeDPI)** (romanvht), **[zaprett](https://github.com/egor-white/zaprett)** (egor-white),
-**[ZDT-D](https://github.com/GAME-OVER-op/ZDT-D)** (GAME-OVER-op).
-
 Подробно, с лицензиями: [THIRD_PARTY.md](THIRD_PARTY.md).
 
 ## Лицензия
