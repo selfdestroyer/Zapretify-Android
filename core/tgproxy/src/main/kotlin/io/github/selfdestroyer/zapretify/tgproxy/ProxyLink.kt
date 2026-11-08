@@ -13,4 +13,11 @@ object ProxyLink {
         val h = if (host.isEmpty() || host == "0.0.0.0") "127.0.0.1" else host
         return "tg://proxy?server=$h&port=$port&secret=dd$secret"
     }
+
+    /** Ссылка Fake TLS (fakeTLSConnectLink в Go): secret=ee<секрет><домен маскировки в hex>. */
+    fun buildFakeTls(host: String, port: Int, secret: String, domain: String): String {
+        require(secretRe.matches(secret)) { "секрет — 32 hex-символа в нижнем регистре" }
+        val hexDomain = domain.toByteArray(Charsets.UTF_8).joinToString("") { "%02x".format(it) }
+        return "tg://proxy?server=$host&port=$port&secret=ee$secret$hexDomain"
+    }
 }
