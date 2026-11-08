@@ -25,7 +25,21 @@ strategies/     набор стратегий byedpi (будет обновля�
 docs/           план и чек-листы
 ```
 
+## Авторы и благодарности
+
+Zapretify для Android построен на работе этих проектов:
+
+- **[byedpi](https://github.com/hufrea/byedpi)** — hufrea, движок обхода без root;
+- **[tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy)** и **[zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube)** — Flowseal, Telegram-прокси, стратегии и списки;
+- **[zapret](https://github.com/bol-van/zapret)** — bol-van, движок `nfqws`;
+- **[hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel)** — heiher, передача трафика из VPN в SOCKS5.
+
+Образцы Android-приложений, на опыт которых мы опираемся: **[ByeDPIAndroid](https://github.com/dovecoteescapee/ByeDPIAndroid)** (dovecoteescapee),
+**[ByeByeDPI](https://github.com/romanvht/ByeByeDPI)** (romanvht), **[zaprett](https://github.com/egor-white/zaprett)** (egor-white),
+**[ZDT-D](https://github.com/GAME-OVER-op/ZDT-D)** (GAME-OVER-op).
+
+Подробно, с лицензиями: [THIRD_PARTY.md](THIRD_PARTY.md).
+
 ## Лицензия
 
-MIT — см. [LICENSE](LICENSE). Используются наработки zapret (bol-van), Flowseal (zapret-discord-youtube,
-tg-ws-proxy) и byedpi (будет добавлен с лицензией при подключении).
+MIT — см. [LICENSE](LICENSE).
