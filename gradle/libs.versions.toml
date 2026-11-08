@@ -1,13 +1,12 @@
-# Версии зафиксированы на заведомо существующих стабильных выпусках.
-# Android Studio может предложить обновить их — это нормально.
+# Версии под Android Studio 2026.2 (в ней AGP 9.5.1 и Java 25). Проверены по официальным репозиториям 08.11.2026.
 [versions]
-agp = "8.7.3"
-kotlin = "2.1.0"
-coroutines = "1.9.0"
-composeBom = "2024.12.01"
-activityCompose = "1.9.3"
-coreKtx = "1.15.0"
-lifecycle = "2.8.7"
+agp = "9.5.1"
+kotlin = "2.4.21"
+coroutines = "1.11.0"
+composeBom = "2026.09.00"
+activityCompose = "1.13.0"
+coreKtx = "1.19.1"
+lifecycle = "2.11.0"
 junit = "4.13.2"
 
 [libraries]
@@ -24,6 +23,5 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

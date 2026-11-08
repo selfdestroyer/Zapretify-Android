@@ -1,18 +1,18 @@
+// AGP 9 компилирует Kotlin сам (встроенная поддержка), отдельный плагин kotlin-android не нужен.
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
 android {
     // Предварительный идентификатор (план, решение 8). После первого выпуска менять нельзя.
     namespace = "io.github.selfdestroyer.zapretify"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "io.github.selfdestroyer.zapretify"
         minSdk = 26 // Android 8.0 — предварительно (план, решение 9)
-        targetSdk = 35
+        targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
     }
@@ -25,9 +25,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = "17"
     }
     buildFeatures {
         compose = true
