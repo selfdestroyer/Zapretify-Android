@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Zapretify</string>
+    <string name="channel_proxy">Telegram-прокси</string>
+    <string name="channel_proxy_desc">Уведомление, пока работает Telegram-прокси</string>
 </resources>

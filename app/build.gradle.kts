@@ -33,6 +33,7 @@ android {
 
 dependencies {
     implementation(project(":core:tgproxy"))
+    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
