@@ -29,7 +29,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import android.app.Activity
 import android.net.VpnService
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.mutableStateOf
@@ -153,6 +156,7 @@ private fun EngineCard(engine: EngineState, context: Context) {
         )
     }
     var menu by remember { mutableStateOf(false) }
+    var customDialog by remember { mutableStateOf(false) }
     Box {
         TextButton(onClick = { menu = true }, enabled = engine.strategies.isNotEmpty()) {
             Text("Стратегия: ${engine.strategy?.name ?: "—"}", color = ZapretifyColors.Muted)
@@ -160,12 +164,20 @@ private fun EngineCard(engine: EngineState, context: Context) {
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             engine.strategies.forEach { st ->
                 DropdownMenuItem(
-                    text = { Column { Text(st.name); Text(st.description, fontSize = 11.sp, color = ZapretifyColors.Muted) } },
+                    text = { Column { Text(st.name); Text(st.description, fontSize = 11.sp, color = ZapretifyColors.Muted, maxLines = 2) } },
                     onClick = { menu = false; EngineController.select(st) },
                 )
             }
+            DropdownMenuItem(
+                text = { Text("Своя стратегия…", color = ZapretifyColors.Indigo) },
+                onClick = { menu = false; customDialog = true },
+            )
         }
     }
+    if (customDialog) CustomStrategyDialog(
+        current = engine.strategies.firstOrNull { it.id == EngineController.CUSTOM_ID }?.args.orEmpty(),
+        onDismiss = { customDialog = false },
+    )
     if (engine.phase == EngineState.Phase.On && engine.apps.isNotEmpty()) {
         Text("Через обход идут: ${engine.apps.joinToString(", ")}", color = ZapretifyColors.Muted, fontSize = 13.sp)
     }
@@ -174,6 +186,35 @@ private fun EngineCard(engine: EngineState, context: Context) {
             "одновременно Android держит только один.", color = ZapretifyColors.Muted, fontSize = 12.sp)
     }
     engine.error?.let { Text(it, color = ZapretifyColors.Red, fontSize = 13.sp) }
+}
+
+/** Своя строка параметров byedpi — например, лучшая из подбора в другой программе для этой сети. */
+@Composable
+private fun CustomStrategyDialog(current: String, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf(current) }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Своя стратегия") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Строка параметров byedpi, например лучшая из подбора для вашей сети.", fontSize = 13.sp, color = ZapretifyColors.Muted)
+                OutlinedTextField(
+                    value = text, onValueChange = { text = it; error = null },
+                    textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
+                    minLines = 3, modifier = Modifier.fillMaxWidth(),
+                )
+                error?.let { Text(it, color = ZapretifyColors.Red, fontSize = 13.sp) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val err = EngineController.setCustom(text)
+                if (err == null) onDismiss() else error = "Не подходит: $err"
+            }) { Text("Применить") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+    )
 }
 
 @Composable

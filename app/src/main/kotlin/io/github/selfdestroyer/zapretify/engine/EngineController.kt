@@ -42,17 +42,32 @@ object EngineController {
 
     fun init(context: Context) {
         app = context.applicationContext
-        val list = runCatching { Strategies.load(app) }.getOrDefault(emptyList())
         val prefs = app.getSharedPreferences("engine", Context.MODE_PRIVATE)
+        val list = runCatching { Strategies.load(app) }.getOrDefault(emptyList()) + listOfNotNull(customStrategy(prefs.getString(KEY_CUSTOM, null)))
         val selected = list.firstOrNull { it.id == prefs.getString(KEY_STRATEGY, null) } ?: list.firstOrNull()
         _state.update { it.copy(strategies = list, strategy = selected) }
+    }
+
+    private fun customStrategy(args: String?): Strategy? =
+        args?.takeIf { it.isNotBlank() }?.let { Strategy(CUSTOM_ID, "Своя стратегия", it, it) }
+
+    /** Своя строка параметров byedpi (например, найденная подбором в другой программе). null — ошибка не найдена. */
+    fun setCustom(args: String): String? {
+        val trimmed = args.trim()
+        StrategyValidator.check(Strategies.splitArgs(trimmed))?.let { return it }
+        if (trimmed.isEmpty()) return "пустая строка"
+        app.getSharedPreferences("engine", Context.MODE_PRIVATE).edit { putString(KEY_CUSTOM, trimmed) }
+        val custom = customStrategy(trimmed)!!
+        _state.update { s -> s.copy(strategies = s.strategies.filter { it.id != CUSTOM_ID } + custom) }
+        select(custom)
+        return null
     }
 
     fun select(strategy: Strategy) {
         app.getSharedPreferences("engine", Context.MODE_PRIVATE).edit { putString(KEY_STRATEGY, strategy.id) }
         val wasOn = _state.value.phase != EngineState.Phase.Off
         _state.update { it.copy(strategy = strategy) }
-        if (wasOn) start() // сервис перезапустит движок с новой стратегией
+        if (wasOn) start() // сервис перезапустит движок с новой стратегией (прокси на это время — напрямую)
     }
 
     /** Запуск. Разрешение на VPN (VpnService.prepare) экран получает заранее. */
@@ -62,7 +77,10 @@ object EngineController {
             _state.update { it.copy(error = "Движок обхода не входит в эту сборку") }
             return
         }
+        val wasOn = _state.value.phase == EngineState.Phase.On
         _state.update { it.copy(phase = EngineState.Phase.Starting, error = null) }
+        // Пока движок перезапускается, его SOCKS5 недоступен: прокси переходит на прямые соединения.
+        if (wasOn) ProxyController.onUpstreamChanged()
         ContextCompat.startForegroundService(app,
             Intent(app, ZapretVpnService::class.java).setAction(ZapretVpnService.ACTION_START).putExtra(ZapretVpnService.EXTRA_ARGS, s.args))
     }
@@ -88,4 +106,6 @@ object EngineController {
     }
 
     private const val KEY_STRATEGY = "strategy"
+    private const val KEY_CUSTOM = "custom_args"
+    const val CUSTOM_ID = "custom"
 }
