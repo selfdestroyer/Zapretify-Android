@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "engine": "byedpi",
+  "strategies": [
+    {
+      "id": "split-disorder",
+      "name": "Разбиение и перестановка",
+      "description": "Лучшая по ручной проверке на этапе 0: YouTube с видео, Discord — чат и голос",
+      "args": "-d1 -d3+s -s6+s -d9+s -s12+s -d15+s -s20+s -d25+s -s30+s -d35+s -r1+s -S -a1 -As -d1 -d3+s -s6+s -d9+s -s12+s -d15+s -s20+s -d25+s -s30+s -d35+s -S -a1"
+    },
+    {
+      "id": "readme-disorder-tlsrec",
+      "name": "Перестановка + разбиение TLS",
+      "description": "Пример из документации byedpi (hufrea/byedpi, MIT)",
+      "args": "--disorder 1 --auto=torst --tlsrec 1+s"
+    },
+    {
+      "id": "readme-fake-ttl",
+      "name": "Фейковый пакет с малым TTL",
+      "description": "Пример из документации byedpi (hufrea/byedpi, MIT)",
+      "args": "--fake -1 --ttl 8"
+    }
+  ]
+}

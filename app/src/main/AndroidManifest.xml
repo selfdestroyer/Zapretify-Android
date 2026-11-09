@@ -8,6 +8,21 @@
     <!-- Android 13+: без этого разрешения уведомление сервиса не показывается. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Только эти приложения: узнать, установлены ли они, чтобы пустить через обход именно их. -->
+    <queries>
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.google.android.apps.youtube.music" />
+        <package android:name="com.discord" />
+        <package android:name="com.android.chrome" />
+        <package android:name="org.mozilla.firefox" />
+        <package android:name="com.yandex.browser" />
+        <package android:name="com.opera.browser" />
+        <package android:name="com.microsoft.emmx" />
+        <package android:name="com.brave.browser" />
+        <package android:name="com.sec.android.app.sbrowser" />
+        <package android:name="com.heytap.browser" />
+    </queries>
+
     <application
         android:name=".ZapretifyApp"
         android:allowBackup="false"
@@ -24,6 +39,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Локальный VPN: трафик выбранных приложений → hev-socks5-tunnel → SOCKS5 byedpi → сеть. -->
+        <service
+            android:name=".vpn.ZapretVpnService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:permission="android.permission.BIND_VPN_SERVICE">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="On-device VPN that applies DPI circumvention to selected apps; no remote server" />
+        </service>
 
         <service
             android:name=".proxy.TgProxyService"

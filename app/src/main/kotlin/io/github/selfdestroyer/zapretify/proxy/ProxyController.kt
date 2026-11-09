@@ -3,6 +3,7 @@ package io.github.selfdestroyer.zapretify.proxy
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
+import io.github.selfdestroyer.zapretify.engine.EngineController
 import io.github.selfdestroyer.zapretify.tgproxy.ProxyConfig
 import io.github.selfdestroyer.zapretify.tgproxy.TgProxyServer
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,7 +74,8 @@ object ProxyController {
     internal fun startServer() {
         thread(name = "tgproxy-start") {
             try {
-                server.start(ProxyConfig(secretHex = settings.secret, port = settings.port))
+                // Пока работает обход, исходящие соединения прокси идут через SOCKS5 byedpi (план, 3.4.3).
+                server.start(ProxyConfig(secretHex = settings.secret, port = settings.port, socks = EngineController.socks))
                 _state.update { it.copy(phase = ProxyState.Phase.On, link = linkFor(), error = null) }
             } catch (e: Exception) {
                 appendLog("[tg-ws-proxy] Не удалось запустить: $e")
@@ -89,6 +91,16 @@ object ProxyController {
     }
 
     val isRunning: Boolean get() = server.isRunning
+
+    /** Обход включился или выключился: перезапустить прокси, чтобы он шёл через движок или напрямую. */
+    internal fun onUpstreamChanged() {
+        if (!server.isRunning) return
+        thread(name = "tgproxy-restart") {
+            server.stop()
+            appendLog(if (EngineController.socks != null) "[tg-ws-proxy] Обход включён: соединения пойдут через движок" else "[tg-ws-proxy] Обход выключен: соединения пойдут напрямую")
+            startServer()
+        }
+    }
 
     private fun appendLog(line: String) {
         val stamped = "${time.format(Date())} $line"

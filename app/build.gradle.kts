@@ -1,4 +1,7 @@
 // AGP 9 компилирует Kotlin сам (встроенная поддержка), отдельный плагин kotlin-android не нужен.
+val nativeSourcesPresent = rootProject.file("native/byedpi/main.c").exists() &&
+    rootProject.file("native/hev-socks5-tunnel/src").isDirectory
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -28,6 +31,17 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+
+    // Встроенный набор стратегий — из папки strategies/ репозитория.
+    sourceSets["main"].assets.directories += "../strategies"
+
+    // Нативные движки (byedpi и hev-socks5-tunnel) собираются, только если их исходники подключены в native/
+    // (git-подмодули). Без них приложение собирается, но обход в нём недоступен.
+    if (nativeSourcesPresent) {
+        ndkVersion = "30.0.16248370"
+        defaultConfig { ndk { abiFilters += listOf("arm64-v8a", "x86_64") } }
+        externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
     }
 }
 

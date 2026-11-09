@@ -27,7 +27,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import android.app.Activity
+import android.net.VpnService
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +55,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import io.github.selfdestroyer.zapretify.engine.EngineController
+import io.github.selfdestroyer.zapretify.engine.EngineState
 import io.github.selfdestroyer.zapretify.proxy.ProxyController
 import io.github.selfdestroyer.zapretify.proxy.ProxyState
 import io.github.selfdestroyer.zapretify.ui.theme.ZapretifyColors
@@ -59,6 +68,7 @@ import io.github.selfdestroyer.zapretify.ui.theme.ZapretifyColors
 @Composable
 fun MainScreen() {
     val state by ProxyController.state.collectAsState()
+    val engine by EngineController.state.collectAsState()
     val context = LocalContext.current
 
     // Android 13+: уведомление сервиса показывается только с разрешения. Прокси работает и без него.
@@ -83,11 +93,7 @@ fun MainScreen() {
 
         TelegramCard(state, onToggle = { on -> if (on) turnOn() else ProxyController.disable() }, context = context)
 
-        ServiceCard(
-            title = "YouTube и Discord",
-            status = "Обход блокировок появится в следующей версии",
-            dot = ZapretifyColors.Muted,
-        ) { Switch(checked = false, onCheckedChange = null, enabled = false) }
+        EngineCard(engine, context)
 
         LogCard(state.log)
     }
@@ -110,8 +116,8 @@ private fun TelegramCard(state: ProxyState, onToggle: (Boolean) -> Unit, context
         }
         if (state.cfBlocked) {
             Text(
-                "Ошибка: провайдер блокирует путь Telegram-прокси через Cloudflare. Это исправится, когда в приложении " +
-                    "появится обход блокировок: прокси будет ходить через него.",
+                "Ошибка: провайдер блокирует путь Telegram-прокси через Cloudflare. Включите «YouTube и Discord» — " +
+                    "пока обход работает, прокси ходит через него.",
                 color = ZapretifyColors.Red, fontSize = 13.sp,
             )
         }
@@ -121,6 +127,53 @@ private fun TelegramCard(state: ProxyState, onToggle: (Boolean) -> Unit, context
         }) { Text("Сменить ключ прокси", color = ZapretifyColors.Muted) }
     }
     state.error?.let { Text(it, color = ZapretifyColors.Red, fontSize = 13.sp) }
+}
+
+/** Карточка обхода YouTube и Discord: включение (с разрешением на VPN), стратегия, приложения. */
+@Composable
+private fun EngineCard(engine: EngineState, context: Context) {
+    // Разрешение на VPN Android спрашивает один раз своим окном.
+    val askVpn = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (it.resultCode == Activity.RESULT_OK) EngineController.start()
+    }
+    fun turnOn() {
+        val consent = VpnService.prepare(context)
+        if (consent != null) askVpn.launch(consent) else EngineController.start()
+    }
+    val (status, dot) = when (engine.phase) {
+        EngineState.Phase.On -> "Работает · ${engine.strategy?.name ?: ""}" to ZapretifyColors.Green
+        EngineState.Phase.Starting -> "Запуск…" to ZapretifyColors.Indigo
+        EngineState.Phase.Off -> (if (engine.nativeAvailable) "Выключен" else "Движок не входит в эту сборку") to ZapretifyColors.Muted
+    }
+    ServiceCard(title = "YouTube и Discord", status = status, dot = dot) {
+        Switch(
+            checked = engine.phase != EngineState.Phase.Off,
+            onCheckedChange = { on -> if (on) turnOn() else EngineController.stop() },
+            enabled = engine.nativeAvailable,
+        )
+    }
+    var menu by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { menu = true }, enabled = engine.strategies.isNotEmpty()) {
+            Text("Стратегия: ${engine.strategy?.name ?: "—"}", color = ZapretifyColors.Muted)
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            engine.strategies.forEach { st ->
+                DropdownMenuItem(
+                    text = { Column { Text(st.name); Text(st.description, fontSize = 11.sp, color = ZapretifyColors.Muted) } },
+                    onClick = { menu = false; EngineController.select(st) },
+                )
+            }
+        }
+    }
+    if (engine.phase == EngineState.Phase.On && engine.apps.isNotEmpty()) {
+        Text("Через обход идут: ${engine.apps.joinToString(", ")}", color = ZapretifyColors.Muted, fontSize = 13.sp)
+    }
+    if (engine.phase == EngineState.Phase.Off && engine.nativeAvailable) {
+        Text("При включении Android попросит разрешение на VPN. Если на телефоне работает другой VPN, он отключится — " +
+            "одновременно Android держит только один.", color = ZapretifyColors.Muted, fontSize = 12.sp)
+    }
+    engine.error?.let { Text(it, color = ZapretifyColors.Red, fontSize = 13.sp) }
 }
 
 @Composable
