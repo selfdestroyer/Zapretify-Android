@@ -85,6 +85,9 @@ object EngineController {
             Intent(app, ZapretVpnService::class.java).setAction(ZapretVpnService.ACTION_START).putExtra(ZapretVpnService.EXTRA_ARGS, s.args))
     }
 
+    /** Ошибка, которую нужно показать в карточке (например, не дали разрешение на VPN). */
+    fun reportError(message: String) = _state.update { it.copy(error = message) }
+
     fun stop() {
         app.startService(Intent(app, ZapretVpnService::class.java).setAction(ZapretVpnService.ACTION_STOP))
     }

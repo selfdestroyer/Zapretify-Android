@@ -74,16 +74,35 @@ fun MainScreen() {
     val engine by EngineController.state.collectAsState()
     val context = LocalContext.current
 
-    // Android 13+: уведомление сервиса показывается только с разрешения. Прокси работает и без него.
-    val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        ProxyController.enable()
+    val version = remember {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty()
     }
+
+    // Один переключатель включает всё: обход YouTube и Discord (VPN) и Telegram-прокси.
+    // Порядок разрешений: уведомления (Android 13+) → VPN. Прокси запускается в любом случае.
+    fun startEngine() = if (engine.nativeAvailable) EngineController.start() else Unit
+    val askVpn = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (it.resultCode == Activity.RESULT_OK) startEngine()
+        else EngineController.reportError("Без разрешения на VPN обход YouTube и Discord не включится")
+    }
+    fun startAll() {
+        ProxyController.enable()
+        val consent = if (engine.nativeAvailable) VpnService.prepare(context) else null
+        if (consent != null) askVpn.launch(consent) else startEngine()
+    }
+    val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { startAll() }
     fun turnOn() {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else ProxyController.enable()
+        } else startAll()
     }
+    fun turnOff() {
+        EngineController.stop()
+        ProxyController.disable()
+    }
+    val anyOn = state.phase != ProxyState.Phase.Off || engine.phase != EngineState.Phase.Off
+    val starting = state.phase == ProxyState.Phase.Starting || engine.phase == EngineState.Phase.Starting
 
     Column(
         modifier = Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -91,27 +110,27 @@ fun MainScreen() {
     ) {
         Column(Modifier.padding(vertical = 8.dp)) {
             Text("Zapretify", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-            Text("Android · предварительная версия", color = ZapretifyColors.Muted, fontSize = 13.sp)
+            Text("Android · v$version · предварительная версия", color = ZapretifyColors.Muted, fontSize = 13.sp)
         }
 
-        TelegramCard(state, onToggle = { on -> if (on) turnOn() else ProxyController.disable() }, context = context)
+        MasterCard(on = anyOn, starting = starting, onToggle = { on -> if (on) turnOn() else turnOff() })
 
-        EngineCard(engine, context)
+        EngineCard(engine)
+
+        TelegramCard(state, context = context)
 
         LogCard(state.log)
     }
 }
 
 @Composable
-private fun TelegramCard(state: ProxyState, onToggle: (Boolean) -> Unit, context: Context) {
+private fun TelegramCard(state: ProxyState, context: Context) {
     val (status, dot) = when (state.phase) {
         ProxyState.Phase.On -> "Работает · 127.0.0.1:${ProxyController.settings.port}" to ZapretifyColors.Green
         ProxyState.Phase.Starting -> "Запуск…" to ZapretifyColors.Indigo
         ProxyState.Phase.Off -> "Выключен" to ZapretifyColors.Muted
     }
-    ServiceCard(title = "Telegram", status = status, dot = dot) {
-        Switch(checked = state.phase != ProxyState.Phase.Off, onCheckedChange = onToggle)
-    }
+    ServiceCard(title = "Telegram", status = status, dot = dot)
     if (state.phase == ProxyState.Phase.On) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             Button(onClick = { openTelegram(context, state.link) }, modifier = Modifier.weight(1f)) { Text("Открыть в Telegram") }
@@ -119,7 +138,7 @@ private fun TelegramCard(state: ProxyState, onToggle: (Boolean) -> Unit, context
         }
         if (state.cfBlocked) {
             Text(
-                "Ошибка: провайдер блокирует путь Telegram-прокси через Cloudflare. Включите «YouTube и Discord» — " +
+                "Ошибка: провайдер блокирует путь Telegram-прокси через Cloudflare. Попробуйте другую стратегию — " +
                     "пока обход работает, прокси ходит через него.",
                 color = ZapretifyColors.Red, fontSize = 13.sp,
             )
@@ -132,29 +151,15 @@ private fun TelegramCard(state: ProxyState, onToggle: (Boolean) -> Unit, context
     state.error?.let { Text(it, color = ZapretifyColors.Red, fontSize = 13.sp) }
 }
 
-/** Карточка обхода YouTube и Discord: включение (с разрешением на VPN), стратегия, приложения. */
+/** Карточка обхода YouTube и Discord: состояние, стратегия, приложения. Включается главным переключателем. */
 @Composable
-private fun EngineCard(engine: EngineState, context: Context) {
-    // Разрешение на VPN Android спрашивает один раз своим окном.
-    val askVpn = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (it.resultCode == Activity.RESULT_OK) EngineController.start()
-    }
-    fun turnOn() {
-        val consent = VpnService.prepare(context)
-        if (consent != null) askVpn.launch(consent) else EngineController.start()
-    }
+private fun EngineCard(engine: EngineState) {
     val (status, dot) = when (engine.phase) {
-        EngineState.Phase.On -> "Работает · ${engine.strategy?.name ?: ""}" to ZapretifyColors.Green
+        EngineState.Phase.On -> "Работает" to ZapretifyColors.Green
         EngineState.Phase.Starting -> "Запуск…" to ZapretifyColors.Indigo
         EngineState.Phase.Off -> (if (engine.nativeAvailable) "Выключен" else "Движок не входит в эту сборку") to ZapretifyColors.Muted
     }
-    ServiceCard(title = "YouTube и Discord", status = status, dot = dot) {
-        Switch(
-            checked = engine.phase != EngineState.Phase.Off,
-            onCheckedChange = { on -> if (on) turnOn() else EngineController.stop() },
-            enabled = engine.nativeAvailable,
-        )
-    }
+    ServiceCard(title = "YouTube и Discord", status = status, dot = dot)
     var menu by remember { mutableStateOf(false) }
     var customDialog by remember { mutableStateOf(false) }
     Box {
@@ -181,11 +186,40 @@ private fun EngineCard(engine: EngineState, context: Context) {
     if (engine.phase == EngineState.Phase.On && engine.apps.isNotEmpty()) {
         Text("Через обход идут: ${engine.apps.joinToString(", ")}", color = ZapretifyColors.Muted, fontSize = 13.sp)
     }
-    if (engine.phase == EngineState.Phase.Off && engine.nativeAvailable) {
-        Text("При включении Android попросит разрешение на VPN. Если на телефоне работает другой VPN, он отключится — " +
-            "одновременно Android держит только один.", color = ZapretifyColors.Muted, fontSize = 12.sp)
-    }
     engine.error?.let { Text(it, color = ZapretifyColors.Red, fontSize = 13.sp) }
+}
+
+/** Главный переключатель: включает обход YouTube и Discord и Telegram-прокси вместе. */
+@Composable
+private fun MasterCard(on: Boolean, starting: Boolean, onToggle: (Boolean) -> Unit) {
+    val (title, sub, dot) = when {
+        starting -> Triple("Запуск…", "Включаем обход и Telegram-прокси", ZapretifyColors.Indigo)
+        on -> Triple("Защита включена", "YouTube, Discord и Telegram работают через Zapretify", ZapretifyColors.Green)
+        else -> Triple("Всё выключено", "Один переключатель — обход YouTube и Discord и Telegram-прокси", ZapretifyColors.Muted)
+    }
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = ZapretifyColors.Surface),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(9.dp).background(dot, CircleShape))
+                        Spacer(Modifier.width(8.dp))
+                        Text(title, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+                    }
+                    Text(sub, color = ZapretifyColors.Muted, fontSize = 13.sp)
+                }
+                Switch(checked = on || starting, onCheckedChange = onToggle)
+            }
+            if (!on && !starting) {
+                Text("При первом включении Android попросит разрешение на VPN. Другой VPN на телефоне при этом " +
+                    "отключится — одновременно Android держит только один.", color = ZapretifyColors.Muted, fontSize = 12.sp)
+            }
+        }
+    }
 }
 
 /** Своя строка параметров byedpi — например, лучшая из подбора в другой программе для этой сети. */
@@ -218,7 +252,7 @@ private fun CustomStrategyDialog(current: String, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun ServiceCard(title: String, status: String, dot: Color, control: @Composable () -> Unit) {
+private fun ServiceCard(title: String, status: String, dot: Color, control: (@Composable () -> Unit)? = null) {
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = ZapretifyColors.Surface),
@@ -233,7 +267,7 @@ private fun ServiceCard(title: String, status: String, dot: Color, control: @Com
                     Text(status, color = ZapretifyColors.Muted, fontSize = 13.sp)
                 }
             }
-            control()
+            control?.invoke()
         }
     }
 }
