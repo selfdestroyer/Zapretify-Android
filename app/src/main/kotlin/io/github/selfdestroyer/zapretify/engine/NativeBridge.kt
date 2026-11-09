@@ -1,7 +1,7 @@
 package io.github.selfdestroyer.zapretify.engine
 
 /**
- * Мост к нативным движкам (app/src/main/cpp): byedpi — локальный SOCKS5 с обходом DPI, hev-socks5-tunnel —
+ * Мост к нативным движкам (app/src/main/jni): byedpi — локальный SOCKS5 с обходом DPI, hev-socks5-tunnel —
  * передаёт трафик из VPN (TUN) в этот SOCKS5. Обе функции run* блокируют поток до остановки.
  * Если библиотеки нет в сборке (исходники движков не подключены), [available] = false и обход недоступен.
  */

@@ -12,10 +12,11 @@ object Strategies {
         val json = JSONObject(context.assets.open("byedpi.json").bufferedReader().use { it.readText() })
         val engine = json.optString("engine", "byedpi")
         val arr = json.getJSONArray("strategies")
+        // Стратегии с запрещёнными опциями в список не попадают.
         return (0 until arr.length()).map { i ->
             val o = arr.getJSONObject(i)
             Strategy(o.getString("id"), o.getString("name"), o.optString("description"), o.getString("args"), engine)
-        }
+        }.filter { StrategyValidator.check(splitArgs(it.args)) == null }
     }
 
     /**

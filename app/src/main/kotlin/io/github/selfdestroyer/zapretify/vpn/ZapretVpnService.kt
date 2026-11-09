@@ -17,6 +17,7 @@ import io.github.selfdestroyer.zapretify.R
 import io.github.selfdestroyer.zapretify.engine.EngineController
 import io.github.selfdestroyer.zapretify.engine.NativeBridge
 import io.github.selfdestroyer.zapretify.engine.Strategies
+import io.github.selfdestroyer.zapretify.engine.StrategyValidator
 import java.net.InetSocketAddress
 import java.net.Socket
 import kotlin.concurrent.thread
@@ -98,8 +99,10 @@ class ZapretVpnService : VpnService() {
     }
 
     private fun startByedpi(args: String) {
+        val strategyArgs = Strategies.splitArgs(args)
+        StrategyValidator.check(strategyArgs)?.let { throw IllegalArgumentException("стратегия отклонена: $it") }
         val argv = arrayOf("ciadpi", "-i", EngineController.SOCKS_HOST, "-p", EngineController.SOCKS_PORT.toString()) +
-            Strategies.splitArgs(args)
+            strategyArgs
         byedpiThread = thread(name = "byedpi") { NativeBridge.runByedpi(argv) }
         // Ждём, пока SOCKS5 начнёт принимать соединения.
         val deadline = System.currentTimeMillis() + 3000
@@ -165,7 +168,8 @@ class ZapretVpnService : VpnService() {
         private const val MTU = 8500
         private const val TUN_IPV4 = "198.18.0.1"
         private const val TUN_IPV6 = "fc00::1"
-        private const val DNS_SERVER = "1.1.1.1"
+        /** DNS внутри туннеля: hev отвечает сам (mapdns), а имя сайта уходит в SOCKS5 — byedpi резолвит его сам. */
+        private const val DNS_SERVER = "198.18.0.2"
 
         /** Приложения, которым нужен обход (план, раздел 3.4, пункт 7). Telegram не входит — он ходит через наш прокси. */
         val DEFAULT_APPS: List<Pair<String, String>> = listOf(
@@ -183,8 +187,9 @@ class ZapretVpnService : VpnService() {
         )
 
         /**
-         * Конфигурация hev-socks5-tunnel (YAML): TUN с нашими адресами, SOCKS5 byedpi как выход.
-         * Ключи сверяются с документацией hev-socks5-tunnel при подключении исходников.
+         * Конфигурация hev-socks5-tunnel (YAML, ключи — по conf/main.yml версии 2.19.3): TUN с нашими адресами,
+         * SOCKS5 byedpi как выход (UDP тоже — для голоса Discord), mapdns: приложения получают от DNS адреса из
+         * 100.64.0.0/10, а hev отдаёт byedpi имя сайта. Так DNS провайдера не участвует, а движок видит домен.
          */
         fun tunnelConfig(): String = """
             |tunnel:
@@ -195,8 +200,14 @@ class ZapretVpnService : VpnService() {
             |  port: ${EngineController.SOCKS_PORT}
             |  address: ${EngineController.SOCKS_HOST}
             |  udp: 'udp'
+            |mapdns:
+            |  address: $DNS_SERVER
+            |  port: 53
+            |  network: 100.64.0.0
+            |  netmask: 255.192.0.0
+            |  cache-size: 10000
             |misc:
-            |  task-stack-size: 81920
+            |  log-level: warn
             |""".trimMargin()
     }
 }
