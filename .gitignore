@@ -17,5 +17,6 @@ keystore.properties
 # macOS
 .DS_Store
 
-# Контекст для Claude — только локально
+# Рабочие документы и контекст для Claude — только локально, в репозиторий не попадают
 CLAUDE.md
+docs/

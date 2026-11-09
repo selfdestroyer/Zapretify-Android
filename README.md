@@ -8,9 +8,6 @@ Zapretify объединяет обход блокировок для YouTube и
 - **Версия 1 (без root):** движок `byedpi` через VpnService, Telegram-прокси, подбор стратегий.
 - **Версия 2 (с root):** `nfqws` и стратегии Flowseal, как на десктопе.
 
-План работ: [`docs/android-port-plan.md`](docs/android-port-plan.md). Ручная проверка перед разработкой:
-[`docs/stage0-checklist.md`](docs/stage0-checklist.md).
-
 ## Сборка
 
 Нужна Android Studio (в ней есть JDK и Android SDK). Открыть папку проекта → дождаться синхронизации Gradle →
@@ -22,7 +19,6 @@ Run. Тесты Telegram-прокси идут без телефона: `./gradl
 app/            Android-приложение (Kotlin, Jetpack Compose)
 core/tgproxy/   Telegram-прокси — обычная Kotlin-библиотека, тестируется на компьютере
 strategies/     набор стратегий byedpi (будет обновляться отсюда)
-docs/           план и чек-листы
 ```
 
 ## Авторы и благодарности
