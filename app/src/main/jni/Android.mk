@@ -21,16 +21,16 @@ rwildcard = $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subs
 HEV_SRC := $(filter-out $(HEV)/src/hev-jni.c,$(call rwildcard,$(HEV)/src/,*.c *.S))
 BYEDPI_SRC := $(addprefix $(BYEDPI)/,packets.c main.c conev.c proxy.c desync.c mpool.c extend.c)
 
-LOCAL_SRC_FILES := zapretify_jni.c $(HEV_SRC) $(BYEDPI_SRC)
+LOCAL_SRC_FILES := zapretify_jni.c zapretify_resolv.c $(HEV_SRC) $(BYEDPI_SRC)
 LOCAL_C_INCLUDES := \
     $(HEV)/src $(HEV)/src/misc $(HEV)/src/core/include \
     $(HEV)/third-part/yaml/include $(HEV)/third-part/lwip/src/include \
     $(HEV)/third-part/lwip/src/ports/include $(HEV)/third-part/hev-task-system/include \
     $(BYEDPI)
 # hev: как в его Android.mk (режим библиотеки). byedpi: журнал в logcat (ANDROID_APP), main переименован,
-# чтобы вызывать его из JNI.
+# чтобы вызывать его из JNI; getaddrinfo — через zapretify_resolv.c (серверы видео только по IPv4).
 LOCAL_CFLAGS := -DFD_SET_DEFINED -DSOCKLEN_T_DEFINED -DENABLE_LIBRARY -DCOMMIT_ID=\"2.19.3\" \
-    -fno-stack-clash-protection -D_DEFAULT_SOURCE -DANDROID_APP -Dmain=byedpi_main \
+    -fno-stack-clash-protection -D_DEFAULT_SOURCE -DANDROID_APP -Dmain=byedpi_main -Dgetaddrinfo=zapretify_getaddrinfo \
     -Wno-unused -Wno-unused-parameter
 LOCAL_STATIC_LIBRARIES := yaml lwip hev-task-system
 LOCAL_LDLIBS := -llog

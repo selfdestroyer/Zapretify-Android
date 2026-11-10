@@ -101,6 +101,7 @@ class ZapretVpnService : VpnService() {
     private fun startByedpi(args: String) {
         val strategyArgs = Strategies.splitArgs(args)
         StrategyValidator.check(strategyArgs)?.let { throw IllegalArgumentException("стратегия отклонена: $it") }
+        // Серверы видео YouTube byedpi подключает только по IPv4 — см. app/src/main/jni/zapretify_resolv.c.
         val argv = arrayOf("ciadpi", "-i", EngineController.SOCKS_HOST, "-p", EngineController.SOCKS_PORT.toString()) +
             strategyArgs
         byedpiThread = thread(name = "byedpi") { NativeBridge.runByedpi(argv) }
@@ -117,8 +118,13 @@ class ZapretVpnService : VpnService() {
 
     private fun startTunnel() {
         val fd = tun?.fd ?: throw IllegalStateException("нет TUN")
-        val config = tunnelConfig()
-        tunnelThread = thread(name = "tunnel") { NativeBridge.runTunnel(config, fd) }
+        val config = tunnelConfig(java.io.File(cacheDir, "hev.log").absolutePath)
+        var rc = 0
+        val t = thread(name = "tunnel") { rc = NativeBridge.runTunnel(config, fd) }
+        tunnelThread = t
+        // Туннель работает, пока его не остановят; если он вышел сразу — трафик приложений никуда не пойдёт.
+        t.join(500)
+        if (!t.isAlive) throw IllegalStateException("туннель не запустился (код $rc)")
     }
 
     private fun stopEngine() {
@@ -191,7 +197,7 @@ class ZapretVpnService : VpnService() {
          * SOCKS5 byedpi как выход (UDP тоже — для голоса Discord), mapdns: приложения получают от DNS адреса из
          * 100.64.0.0/10, а hev отдаёт byedpi имя сайта. Так DNS провайдера не участвует, а движок видит домен.
          */
-        fun tunnelConfig(): String = """
+        fun tunnelConfig(logFile: String): String = """
             |tunnel:
             |  mtu: $MTU
             |  ipv4: $TUN_IPV4
@@ -207,6 +213,7 @@ class ZapretVpnService : VpnService() {
             |  netmask: 255.192.0.0
             |  cache-size: 10000
             |misc:
+            |  log-file: $logFile
             |  log-level: warn
             |""".trimMargin()
     }

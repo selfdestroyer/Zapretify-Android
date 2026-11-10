@@ -21,6 +21,9 @@ extern int server_fd;
 static struct params params_defaults;
 static pthread_mutex_t byedpi_lock = PTHREAD_MUTEX_INITIALIZER;
 static volatile int byedpi_running;
+/* hev запоминает «стоп», пришедший до запуска, и тогда следующий запуск сразу завершается.
+ * Поэтому останавливаем туннель, только когда он действительно запущен. */
+static volatile int tunnel_running;
 
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     memcpy(&params_defaults, &params, sizeof(params));
@@ -69,12 +72,14 @@ Java_io_github_selfdestroyer_zapretify_engine_NativeBridge_runTunnel(JNIEnv *env
     char *copy = strdup(cfg);
     (*env)->ReleaseStringUTFChars(env, jconfig, cfg);
     if (!copy) return -1;
+    tunnel_running = 1;
     int rc = hev_socks5_tunnel_main_from_str((const unsigned char *)copy, (unsigned int)strlen(copy), fd);
+    tunnel_running = 0;
     free(copy);
     return rc;
 }
 
 JNIEXPORT void JNICALL
 Java_io_github_selfdestroyer_zapretify_engine_NativeBridge_stopTunnel(JNIEnv *env, jobject thiz) {
-    hev_socks5_tunnel_quit();
+    if (tunnel_running) hev_socks5_tunnel_quit();
 }
