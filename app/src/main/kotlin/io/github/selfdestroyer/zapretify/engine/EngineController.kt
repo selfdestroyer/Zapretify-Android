@@ -97,6 +97,8 @@ object EngineController {
         _state.update { it.copy(phase = EngineState.Phase.Starting, error = null) }
         // Пока движок перезапускается, его SOCKS5 недоступен: прокси переходит на прямые соединения.
         if (wasOn) ProxyController.onUpstreamChanged()
+        // byedpi в приложении один: движок, запущенный только для прокси, уступает место VPN-движку.
+        io.github.selfdestroyer.zapretify.proxy.ProxyController.releaseBypass()
         ContextCompat.startForegroundService(app,
             Intent(app, ZapretVpnService::class.java).setAction(ZapretVpnService.ACTION_START).putExtra(ZapretVpnService.EXTRA_ARGS, s.args))
     }

@@ -88,6 +88,7 @@ object SelectionController {
         _state.update { SelectionState(running = true, total = candidates.size + 1, current = "Подготовка") }
         thread(name = "selection") {
             val wasOn = EngineController.state.value.phase != EngineState.Phase.Off
+            val proxyBypass = io.github.selfdestroyer.zapretify.proxy.ProxyController.releaseBypassForSelection()
             try {
                 if (wasOn) {
                     EngineController.stop()
@@ -108,6 +109,7 @@ object SelectionController {
                 _state.update { it.copy(running = false, error = "Подбор не удался: ${e.message}") }
             } finally {
                 if (wasOn) EngineController.start()
+                else if (proxyBypass) io.github.selfdestroyer.zapretify.proxy.ProxyController.resumeBypass()
             }
         }
     }

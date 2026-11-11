@@ -59,6 +59,7 @@ object ProxyController {
 
     fun disable() {
         settings.enabled = false
+        thread(name = "proxy-bypass-stop") { ProxyBypass.stop() }
         app.startService(Intent(app, TgProxyService::class.java).setAction(TgProxyService.ACTION_STOP))
     }
 
@@ -76,7 +77,7 @@ object ProxyController {
         thread(name = "tgproxy-start") {
             try {
                 // Пока работает обход, исходящие соединения прокси идут через SOCKS5 byedpi (план, 3.4.3).
-                server.start(ProxyConfig(secretHex = settings.secret, port = settings.port, socks = EngineController.socks))
+                server.start(ProxyConfig(secretHex = settings.secret, port = settings.port, socks = EngineController.socks ?: ProxyBypass.socks))
                 _state.update { it.copy(phase = ProxyState.Phase.On, link = linkFor(), error = null) }
                 StatusNotification.refresh(app)
             } catch (e: Exception) {
@@ -100,7 +101,11 @@ object ProxyController {
         if (!server.isRunning) return
         thread(name = "tgproxy-restart") {
             server.stop()
-            appendLog(if (EngineController.socks != null) "[tg-ws-proxy] Обход включён: соединения пойдут через движок" else "[tg-ws-proxy] Обход выключен: соединения пойдут напрямую")
+            appendLog(when {
+                EngineController.socks != null -> "[tg-ws-proxy] Обход включён: соединения пойдут через движок"
+                ProxyBypass.running -> "[tg-ws-proxy] Соединения пойдут через движок обхода только для прокси"
+                else -> "[tg-ws-proxy] Обход выключен: соединения пойдут напрямую"
+            })
             startServer()
         }
     }
@@ -108,6 +113,50 @@ object ProxyController {
     private fun appendLog(line: String) {
         val stamped = "${time.format(Date())} $line"
         _state.update { s -> s.copy(log = (s.log + stamped).takeLast(MAX_LOG), cfBlocked = server.cfProxyBlocked) }
+        if (line.contains("нет доступных путей")) noPath++
+        maybeUseBypass()
+    }
+
+    private var noPath = 0
+
+    /** Подбору нужен byedpi: остановить движок прокси. true — он работал (после подбора включить снова). */
+    internal fun releaseBypassForSelection(): Boolean {
+        val was = ProxyBypass.running
+        if (was) { ProxyBypass.stop(); onUpstreamChanged() }
+        return was
+    }
+
+    internal fun resumeBypass() {
+        val args = EngineController.state.value.strategy?.args ?: return
+        if (ProxyBypass.start(args)) onUpstreamChanged()
+    }
+
+    /** Остановить движок прокси (перед запуском VPN-движка или подбора). Ждёт до ~3 с — не из главного потока. */
+    fun releaseBypass() {
+        if (!ProxyBypass.running) return
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            val t = thread(name = "proxy-bypass-release") { ProxyBypass.stop() }
+            t.join(3500)
+        } else ProxyBypass.stop()
+    }
+
+    /**
+     * Прокси не пробивается сам (путь через Cloudflare заблокирован или пути к Telegram нет), а обход YouTube и
+     * Discord выключен — тогда прокси пойдёт через свой движок обхода без VPN. В настройках об этом не пишем:
+     * это внутренняя часть прокси.
+     */
+    private fun maybeUseBypass() {
+        val stuck = server.cfProxyBlocked || noPath >= 2
+        if (!stuck || ProxyBypass.running || EngineController.socks != null || !server.isRunning) return
+        if (EngineController.state.value.phase != io.github.selfdestroyer.zapretify.engine.EngineState.Phase.Off) return
+        val args = EngineController.state.value.strategy?.args ?: return
+        noPath = 0
+        thread(name = "proxy-bypass-start") {
+            if (ProxyBypass.start(args)) {
+                appendLog("[tg-ws-proxy] Напрямую прокси не пробивается — включаю движок обхода только для него")
+                onUpstreamChanged()
+            }
+        }
     }
 
     private const val MAX_LOG = 200
