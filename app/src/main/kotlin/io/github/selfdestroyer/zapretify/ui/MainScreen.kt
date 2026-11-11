@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,7 +35,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.selfdestroyer.zapretify.selection.SelectionController
@@ -84,7 +88,7 @@ fun MainScreen() {
 /** Парящая полупрозрачная панель разделов: не прижата к краям, содержимое видно сквозь неё. */
 @Composable
 private fun FloatingBar(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(26.dp)
+    val shape = RoundedCornerShape(24.dp)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -92,13 +96,13 @@ private fun FloatingBar(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifi
             .clip(shape)
             .background(ZapretifyColors.Raised.copy(alpha = 0.82f))
             .border(BorderStroke(1.dp, ZapretifyColors.Text.copy(alpha = 0.08f)), shape)
-            .padding(6.dp),
+            .padding(5.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Tab.entries.forEach { t ->
             val active = t == selected
-            val itemShape = RoundedCornerShape(20.dp)
+            val itemShape = RoundedCornerShape(19.dp)
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -106,12 +110,22 @@ private fun FloatingBar(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifi
                     .background(if (active) ZapretifyColors.Indigo.copy(alpha = 0.28f) else Color.Transparent)
                     .then(if (active) Modifier.border(BorderStroke(1.dp, ZapretifyColors.Indigo.copy(alpha = 0.55f)), itemShape) else Modifier)
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Tab) { onSelect(t) }
-                    .padding(vertical = 8.dp),
+                    .height(48.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
+                // Значок и подпись — по центру плашки; у подписи убраны служебные поля шрифта, иначе она смещает всё вверх.
+                verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
             ) {
                 val color = if (active) ZapretifyColors.Text else ZapretifyColors.Muted
-                Icon(t.icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
-                Text(t.title, color = color, fontSize = 10.5.sp, maxLines = 1, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
+                Icon(t.icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+                Text(
+                    t.title, color = color, maxLines = 1,
+                    style = TextStyle(
+                        fontSize = 10.5.sp, lineHeight = 12.sp,
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                        lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
+                    ),
+                )
             }
         }
     }

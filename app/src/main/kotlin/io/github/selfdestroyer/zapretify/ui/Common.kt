@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.sp
 import io.github.selfdestroyer.zapretify.ui.theme.ZapretifyColors
 
 /** Место внизу раздела под парящую панель: последний элемент должен прокручиваться выше неё. */
-internal val BarSpace = 104.dp
+internal val BarSpace = 92.dp
 
 /** Заголовок раздела с необязательной подписью. */
 @Composable
