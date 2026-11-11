@@ -117,7 +117,7 @@ object ProfileController {
     fun activate(profile: Profile) {
         _state.update { it.copy(activeId = profile.id) }
         persist()
-        EngineController.applyArgs(profile.strategyArgs)
+        EngineController.applyArgs(profile.strategyArgs, profile.strategyName)
     }
 
     /**

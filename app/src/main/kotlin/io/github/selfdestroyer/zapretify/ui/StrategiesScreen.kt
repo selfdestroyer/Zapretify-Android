@@ -75,8 +75,9 @@ fun StrategiesScreen() {
             item { Text("Итоги подбора", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
             val shown = if (showAll || selection.running) selection.rows else selection.rows.take(TOP_RESULTS)
             itemsIndexed(shown, key = { _, r -> "r-" + r.strategyId }) { index, row ->
-                ResultCard(index + 1, row, selected = row.strategyId == selectedId || row.args == selectedArgs, enabled = !selection.running,
-                    fixArgs = videoFix(row, selection.rows), onToProfile = { toProfile = it })
+                val fix = videoFix(row, selection.rows)
+                ResultCard(index + 1, row, selected = (fix ?: row.args) == selectedArgs, enabled = !selection.running,
+                    fixArgs = fix, onToProfile = { toProfile = it })
             }
             if (!showAll && !selection.running && selection.rows.size > TOP_RESULTS) {
                 item {
@@ -209,13 +210,13 @@ private fun ResultCard(place: Int, row: SelectionRow, selected: Boolean, enabled
                     enabled = enabled, onClick = { onToProfile(name to args) },
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), modifier = Modifier.weight(1f),
                 ) { Text("В профиль…", fontSize = 13.sp, maxLines = 1) }
-                if (selected && fixArgs == null) {
+                if (selected) {
                     OutlinedButton(onClick = {}, enabled = false, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), modifier = Modifier.weight(1f)) {
                         Text("Выбрана", color = ZapretifyColors.Green, fontSize = 13.sp, maxLines = 1)
                     }
                 } else {
                     Button(
-                        enabled = enabled, onClick = { apply(row.strategyId, args) },
+                        enabled = enabled, onClick = { apply(row.strategyId, args, name) },
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), modifier = Modifier.weight(1f),
                     ) { Text(if (fixArgs != null) "Применить с исправлением" else "Применить", fontSize = 13.sp, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
                 }
@@ -225,9 +226,9 @@ private fun ResultCard(place: Int, row: SelectionRow, selected: Boolean, enabled
 }
 
 /** Стратегии из набора выбираются по имени; исправленная или собранная подбором сохраняется как «Своя». */
-private fun apply(strategyId: String, args: String) {
+private fun apply(strategyId: String, args: String, name: String) {
     val known = EngineController.state.value.strategies.firstOrNull { it.id == strategyId && it.args == args }
-    if (known != null) EngineController.select(known) else EngineController.setCustom(args)
+    if (known != null) EngineController.select(known) else EngineController.setCustom(args, name = name)
 }
 
 /** Окно выбора профиля, к которому привязать стратегию. */
