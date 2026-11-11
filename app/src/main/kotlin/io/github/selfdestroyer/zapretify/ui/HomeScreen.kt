@@ -89,6 +89,10 @@ fun HomeScreen(onOpenStrategies: () -> Unit) {
         ProxyController.disable()
     }
     val anyOn = proxy.phase != ProxyState.Phase.Off || engine.phase != EngineState.Phase.Off
+    // Обход включали, а он остановился сам (сбой движка или Android выгрузил приложение и поднял только прокси):
+    // Telegram работает, YouTube и Discord — нет.
+    val engineDropped = proxy.phase == ProxyState.Phase.On && engine.phase == EngineState.Phase.Off &&
+        engine.nativeAvailable && engine.wanted
     val starting = proxy.phase == ProxyState.Phase.Starting || engine.phase == EngineState.Phase.Starting
 
     Column(
@@ -97,20 +101,22 @@ fun HomeScreen(onOpenStrategies: () -> Unit) {
     ) {
         ScreenTitle("Zapretify", "Android · v$version · предварительная версия")
 
-        MasterCard(on = anyOn, starting = starting, enabled = !selection.running, onToggle = { on -> if (on) turnOn() else turnOff() })
+        MasterCard(on = anyOn, starting = starting, partial = engineDropped, enabled = !selection.running, onToggle = { on -> if (on) turnOn() else turnOff() })
         if (selection.running) {
             Text("Идёт подбор стратегии — обход включится сам, когда он закончится.", color = ZapretifyColors.Amber, fontSize = 13.sp)
         }
 
-        EngineCard(engine, neverSelected = selection.finishedAt == 0L && !selection.running, onOpenStrategies = onOpenStrategies)
+        EngineCard(engine, neverSelected = selection.finishedAt == 0L && !selection.running, onOpenStrategies = onOpenStrategies,
+            onRestart = if (engineDropped && !selection.running) ({ startAll() }) else null)
         TelegramCard(proxy, context)
         Spacer(Modifier.height(BarSpace))
     }
 }
 
 @Composable
-private fun MasterCard(on: Boolean, starting: Boolean, enabled: Boolean, onToggle: (Boolean) -> Unit) {
+private fun MasterCard(on: Boolean, starting: Boolean, partial: Boolean, enabled: Boolean, onToggle: (Boolean) -> Unit) {
     val (title, sub, dot) = when {
+        partial -> Triple("Работает частично", "Telegram работает, обход YouTube и Discord остановился", ZapretifyColors.Amber)
         starting -> Triple("Запуск…", "Включаем обход и Telegram-прокси", ZapretifyColors.Indigo)
         on -> Triple("Защита включена", "YouTube, Discord и Telegram работают через Zapretify", ZapretifyColors.Green)
         else -> Triple("Всё выключено", "Один переключатель — обход YouTube и Discord и Telegram-прокси", ZapretifyColors.Muted)
@@ -142,7 +148,7 @@ private fun MasterCard(on: Boolean, starting: Boolean, enabled: Boolean, onToggl
 
 /** Обход YouTube и Discord: состояние и текущая стратегия. Выбор и подбор — в разделе «Стратегии». */
 @Composable
-private fun EngineCard(engine: EngineState, neverSelected: Boolean, onOpenStrategies: () -> Unit) {
+private fun EngineCard(engine: EngineState, neverSelected: Boolean, onOpenStrategies: () -> Unit, onRestart: (() -> Unit)?) {
     val (status, dot) = when (engine.phase) {
         EngineState.Phase.On -> "Работает" to ZapretifyColors.Green
         EngineState.Phase.Starting -> "Запуск…" to ZapretifyColors.Indigo
@@ -161,6 +167,14 @@ private fun EngineCard(engine: EngineState, neverSelected: Boolean, onOpenStrate
         engine.error?.let {
             Spacer(Modifier.height(6.dp))
             Text(it, color = ZapretifyColors.Red, fontSize = 13.sp)
+        }
+        if (onRestart != null && engine.error == null) {
+            Spacer(Modifier.height(6.dp))
+            Text("Обход остановился, YouTube и Discord идут напрямую.", color = ZapretifyColors.Red, fontSize = 13.sp)
+        }
+        if (onRestart != null) {
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = onRestart) { Text("Включить обход снова") }
         }
         if (engine.nativeAvailable) {
             TextButton(onClick = onOpenStrategies, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {

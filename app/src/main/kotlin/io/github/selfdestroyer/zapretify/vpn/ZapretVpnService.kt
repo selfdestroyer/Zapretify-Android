@@ -122,7 +122,7 @@ class ZapretVpnService : VpnService() {
                     val byedpiAlive = byedpiThread?.isAlive == true
                     val tunnelAlive = tunnelThread?.isAlive == true
                     if (!byedpiAlive || !tunnelAlive) {
-                        shutdown("Обход остановился сам (${if (!byedpiAlive) "движок" else "туннель"}). Включите его заново.")
+                        shutdown("Обход остановился сам (${if (!byedpiAlive) "движок" else "туннель"}), YouTube и Discord идут напрямую.")
                         return@thread
                     }
                 }

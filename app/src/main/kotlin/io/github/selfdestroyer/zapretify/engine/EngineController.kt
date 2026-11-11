@@ -23,6 +23,8 @@ data class EngineState(
     /** Какие приложения идут через обход (названия для экрана). */
     val apps: List<String> = emptyList(),
     val nativeAvailable: Boolean = NativeBridge.available,
+    /** Пользователь включил обход (и не выключал). Если при этом [phase] = Off — обход остановился сам. */
+    val wanted: Boolean = false,
 ) {
     enum class Phase { Off, Starting, On }
 }
@@ -46,7 +48,7 @@ object EngineController {
         val prefs = app.getSharedPreferences("engine", Context.MODE_PRIVATE)
         val list = runCatching { Strategies.load(app) }.getOrDefault(emptyList()) + listOfNotNull(customStrategy(prefs.getString(KEY_CUSTOM, null)))
         val selected = list.firstOrNull { it.id == prefs.getString(KEY_STRATEGY, null) } ?: list.firstOrNull()
-        _state.update { it.copy(strategies = list, strategy = selected) }
+        _state.update { it.copy(strategies = list, strategy = selected, wanted = prefs.getBoolean(KEY_WANTED, false)) }
     }
 
     private fun customStrategy(args: String?): Strategy? =
@@ -79,6 +81,7 @@ object EngineController {
             return
         }
         val wasOn = _state.value.phase == EngineState.Phase.On
+        setWanted(true)
         _state.update { it.copy(phase = EngineState.Phase.Starting, error = null) }
         // Пока движок перезапускается, его SOCKS5 недоступен: прокси переходит на прямые соединения.
         if (wasOn) ProxyController.onUpstreamChanged()
@@ -90,6 +93,7 @@ object EngineController {
     fun reportError(message: String) = _state.update { it.copy(error = message) }
 
     fun stop() {
+        setWanted(false)
         app.startService(Intent(app, ZapretVpnService::class.java).setAction(ZapretVpnService.ACTION_STOP))
     }
 
@@ -111,6 +115,12 @@ object EngineController {
         StatusNotification.refresh(app)
     }
 
+    private fun setWanted(on: Boolean) {
+        app.getSharedPreferences("engine", Context.MODE_PRIVATE).edit { putBoolean(KEY_WANTED, on) }
+        _state.update { it.copy(wanted = on) }
+    }
+
+    private const val KEY_WANTED = "wanted"
     private const val KEY_STRATEGY = "strategy"
     private const val KEY_CUSTOM = "custom_args"
     const val CUSTOM_ID = "custom"
