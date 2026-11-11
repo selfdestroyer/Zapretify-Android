@@ -14,6 +14,13 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,117 +103,129 @@ fun HomeScreen(onOpenStrategies: () -> Unit) {
         engine.nativeAvailable && engine.wanted
     val starting = proxy.phase == ProxyState.Phase.Starting || engine.phase == EngineState.Phase.Starting
 
+    val profiles by ProfileController.state.collectAsState()
+    val profile = profiles.profiles.firstOrNull { it.id == profiles.activeId }
+
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        // Кнопка — посередине свободного места, плитки сервисов — внизу, над панелью разделов.
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        ScreenTitle("Zapretify", "v$version")
+        Box(Modifier.fillMaxWidth()) { ScreenTitle("Zapretify", "v$version") }
 
-        MasterCard(on = anyOn, starting = starting, partial = engineDropped, enabled = !selection.running, onToggle = { on -> if (on) turnOn() else turnOff() })
-        if (selection.running) {
-            Text("Идёт подбор стратегии…", color = ZapretifyColors.Amber, fontSize = 13.sp)
+        Spacer(Modifier.weight(1f))
+        PowerButton(
+            state = when {
+                starting -> Power.STARTING
+                engineDropped -> Power.PARTIAL
+                anyOn -> Power.ON
+                else -> Power.OFF
+            },
+            enabled = !selection.running,
+            onClick = { if (anyOn || starting) turnOff() else turnOn() },
+        )
+        Text(
+            when {
+                selection.running -> "Идёт подбор стратегии…"
+                starting -> "Запуск…"
+                engineDropped -> "Работает частично"
+                anyOn -> "Включено"
+                else -> "Выключено"
+            },
+            fontWeight = FontWeight.SemiBold, fontSize = 18.sp,
+        )
+        // Профиль и стратегия — в плашке; нажатие открывает раздел «Стратегии».
+        Box(
+            Modifier.clip(RoundedCornerShape(50)).background(ZapretifyColors.Surface)
+                .clickable(enabled = engine.nativeAvailable, onClick = onOpenStrategies)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            Text(
+                listOfNotNull(profile?.name, engine.strategy?.name).joinToString(" · ").ifEmpty { "Выбрать стратегию" },
+                color = ZapretifyColors.Muted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
         }
+        val error = engine.error ?: proxy.error
+        if (error != null) Text(error, color = ZapretifyColors.Red, fontSize = 13.sp)
+        if (engineDropped && !selection.running) Button(onClick = { startAll() }) { Text("Включить обход снова") }
 
-        EngineCard(engine, neverSelected = selection.finishedAt == 0L && !selection.running, onOpenStrategies = onOpenStrategies,
-            onRestart = if (engineDropped && !selection.running) ({ startAll() }) else null)
-        TelegramCard(proxy, context)
-        Spacer(Modifier.height(BarSpace))
+        Spacer(Modifier.weight(1f))
+        val engineStatus = when {
+            engine.phase == EngineState.Phase.On -> Status.WORKS
+            engine.phase == EngineState.Phase.Starting -> Status.STARTING
+            engineDropped -> Status.FAILED
+            else -> Status.OFF
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            ServiceTile("YouTube", engineStatus, Modifier.weight(1f))
+            ServiceTile("Discord", engineStatus, Modifier.weight(1f))
+        }
+        val tgStatus = when (proxy.phase) {
+            ProxyState.Phase.On -> if (proxy.cfBlocked) Status.PARTIAL else Status.WORKS
+            ProxyState.Phase.Starting -> Status.STARTING
+            ProxyState.Phase.Off -> Status.OFF
+        }
+        ServiceTile("Telegram", tgStatus, Modifier.fillMaxWidth()) {
+            if (proxy.phase == ProxyState.Phase.On) {
+                Button(onClick = { openTelegram(context, proxy.link) }) { Text("Перейти в Telegram") }
+            }
+        }
+        if (proxy.cfBlocked && proxy.phase == ProxyState.Phase.On) {
+            Text("Провайдер режет путь прокси через Cloudflare — попробуйте другую стратегию.", color = ZapretifyColors.Amber, fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(BarSpace - 8.dp))
     }
 }
 
+private enum class Power { OFF, STARTING, ON, PARTIAL }
+
+/** Большая круглая кнопка включения, как в приложениях-аналогах: цвет показывает состояние. */
 @Composable
-private fun MasterCard(on: Boolean, starting: Boolean, partial: Boolean, enabled: Boolean, onToggle: (Boolean) -> Unit) {
-    val (title, sub, dot) = when {
-        partial -> Triple("Работает частично", "Обход YouTube и Discord остановился", ZapretifyColors.Amber)
-        starting -> Triple("Запуск…", "", ZapretifyColors.Indigo)
-        on -> Triple("Включено", "YouTube, Discord, Telegram", ZapretifyColors.Green)
-        else -> Triple("Выключено", "", ZapretifyColors.Muted)
+private fun PowerButton(state: Power, enabled: Boolean, onClick: () -> Unit) {
+    val color = when (state) {
+        Power.ON -> ZapretifyColors.Indigo
+        Power.PARTIAL -> ZapretifyColors.Amber
+        Power.STARTING -> ZapretifyColors.Indigo.copy(alpha = 0.55f)
+        Power.OFF -> ZapretifyColors.Raised
     }
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = ZapretifyColors.Surface),
-        modifier = Modifier.fillMaxWidth(),
+    val iconColor = if (state == Power.OFF) ZapretifyColors.Muted else ZapretifyColors.Text
+    Box(
+        modifier = Modifier
+            .size(168.dp)
+            .shadow(if (state == Power.OFF) 0.dp else 28.dp, CircleShape, ambientColor = color, spotColor = color)
+            .clip(CircleShape)
+            .background(color)
+            .border(1.dp, ZapretifyColors.Text.copy(alpha = if (state == Power.OFF) 0.08f else 0.18f), CircleShape)
+            .clickable(enabled = enabled, role = Role.Switch, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(9.dp).background(dot, CircleShape))
-                        Spacer(Modifier.width(8.dp))
-                        Text(title, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-                    }
-                    if (sub.isNotEmpty()) Text(sub, color = ZapretifyColors.Muted, fontSize = 13.sp)
-                }
-                Switch(checked = on || starting, onCheckedChange = onToggle, enabled = enabled)
-            }
-        }
+        Icon(NavIcons.Power, contentDescription = if (state == Power.OFF) "Включить" else "Выключить", tint = iconColor, modifier = Modifier.size(64.dp))
     }
 }
 
-/** Обход YouTube и Discord: состояние и текущая стратегия. Выбор и подбор — в разделе «Стратегии». */
-@Composable
-private fun EngineCard(engine: EngineState, neverSelected: Boolean, onOpenStrategies: () -> Unit, onRestart: (() -> Unit)?) {
-    val (status, dot) = when (engine.phase) {
-        EngineState.Phase.On -> "Работает" to ZapretifyColors.Green
-        EngineState.Phase.Starting -> "Запуск…" to ZapretifyColors.Indigo
-        EngineState.Phase.Off -> (if (engine.nativeAvailable) "Выключен" else "Движок не входит в эту сборку") to ZapretifyColors.Muted
-    }
-    SectionCard {
-        Text("YouTube и Discord", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-        StatusLine(status, dot)
-        Spacer(Modifier.height(8.dp))
-        val profiles by ProfileController.state.collectAsState()
-        val profile = profiles.profiles.firstOrNull { it.id == profiles.activeId }
-        Text(if (profile != null) "Профиль «${profile.name}»" else "Стратегия", color = ZapretifyColors.Muted, fontSize = 12.sp)
-        Text(engine.strategy?.name ?: "—", fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        engine.error?.let {
-            Spacer(Modifier.height(6.dp))
-            Text(it, color = ZapretifyColors.Red, fontSize = 13.sp)
-        }
-        if (onRestart != null && engine.error == null) {
-            Spacer(Modifier.height(6.dp))
-            Text("Обход остановился", color = ZapretifyColors.Red, fontSize = 13.sp)
-        }
-        if (onRestart != null) {
-            Spacer(Modifier.height(8.dp))
-            Button(onClick = onRestart) { Text("Включить обход снова") }
-        }
-        if (engine.nativeAvailable) {
-            TextButton(onClick = onOpenStrategies, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                Text(if (neverSelected) "Подобрать стратегию для этой сети" else "Сменить стратегию", color = ZapretifyColors.Indigo)
-            }
-        }
+private enum class Status(val text: String) {
+    WORKS("Работает"), PARTIAL("Работает частично"), FAILED("Не работает"), STARTING("Запуск…"), OFF("Выключен");
+    val color: Color get() = when (this) {
+        WORKS -> ZapretifyColors.Green
+        PARTIAL -> ZapretifyColors.Amber
+        FAILED -> ZapretifyColors.Red
+        STARTING -> ZapretifyColors.Indigo
+        OFF -> ZapretifyColors.Muted
     }
 }
 
+/** Плитка сервиса: название и состояние; [action] — кнопка справа (у Telegram). */
 @Composable
-private fun TelegramCard(state: ProxyState, context: Context) {
-    val (status, dot) = when (state.phase) {
-        ProxyState.Phase.On -> "Работает" to ZapretifyColors.Green
-        ProxyState.Phase.Starting -> "Запуск…" to ZapretifyColors.Indigo
-        ProxyState.Phase.Off -> "Выключен" to ZapretifyColors.Muted
-    }
-    SectionCard {
-        Text("Telegram", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-        StatusLine(status, dot)
-        if (state.phase == ProxyState.Phase.On) {
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = { openTelegram(context, state.link) }, modifier = Modifier.weight(1f)) { Text("Открыть в Telegram") }
-                OutlinedButton(onClick = { copyLink(context, state.link) }) { Text("Ссылка") }
+private fun ServiceTile(name: String, status: Status, modifier: Modifier = Modifier, action: (@Composable () -> Unit)? = null) {
+    SectionCard(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Spacer(Modifier.height(4.dp))
+                StatusLine(status.text, status.color)
             }
-            if (state.cfBlocked) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Ошибка: провайдер блокирует путь Telegram-прокси через Cloudflare. Попробуйте другую стратегию — " +
-                        "пока обход работает, прокси ходит через него.",
-                    color = ZapretifyColors.Red, fontSize = 13.sp,
-                )
-            }
-        }
-        state.error?.let {
-            Spacer(Modifier.height(6.dp))
-            Text(it, color = ZapretifyColors.Red, fontSize = 13.sp)
+            action?.invoke()
         }
     }
 }
@@ -221,10 +240,4 @@ private fun openTelegram(context: Context, link: String?) {
     } catch (_: ActivityNotFoundException) {
         Toast.makeText(context, "Telegram не установлен", Toast.LENGTH_LONG).show()
     }
-}
-
-private fun copyLink(context: Context, link: String?) {
-    if (link == null) return
-    context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Telegram proxy", link))
-    Toast.makeText(context, "Ссылка скопирована", Toast.LENGTH_SHORT).show()
 }
