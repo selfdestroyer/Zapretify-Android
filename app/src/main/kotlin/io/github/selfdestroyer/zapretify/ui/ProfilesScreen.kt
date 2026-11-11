@@ -118,6 +118,7 @@ private fun ProfileTile(p: Profile, active: Boolean, here: Boolean, onOpen: () -
                 Text(p.networkTitle ?: "Без сети — включается вручную", color = ZapretifyColors.Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(4.dp))
                 Text(p.strategyName, color = ZapretifyColors.Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(p.strategyArgs, color = ZapretifyColors.Muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Spacer(Modifier.width(10.dp))
             if (active) {
@@ -143,9 +144,10 @@ private fun ProfileSheet(profile: Profile?, onClose: () -> Unit) {
     val strategies = engine.strategies
     var name by remember { mutableStateOf(profile?.name.orEmpty()) }
     var strategy by remember {
-        mutableStateOf(strategies.firstOrNull { it.args == profile?.strategyArgs }
-            ?: profile?.let { Strategy("profile", it.strategyName, it.strategyArgs, it.strategyArgs) }
-            ?: engine.strategy ?: strategies.firstOrNull())
+        mutableStateOf(profile?.let { p ->
+            strategies.firstOrNull { it.args == p.strategyArgs && it.id != EngineController.CUSTOM_ID }
+                ?: Strategy("profile", p.strategyName, p.strategyArgs, p.strategyArgs)
+        } ?: engine.strategy ?: strategies.firstOrNull())
     }
     var network by remember { mutableStateOf(profile?.networkKey?.let { NetworkId.fromKey(it, profile.networkTitle) }) }
     var menu by remember { mutableStateOf(false) }

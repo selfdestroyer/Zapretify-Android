@@ -203,14 +203,21 @@ private fun ResultCard(place: Int, row: SelectionRow, selected: Boolean, enabled
             // Применяется исправленная стратегия, если исправление есть.
             val name = if (fixArgs != null) "${row.name} + видео" else row.name
             val args = fixArgs ?: row.args
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(enabled = enabled, onClick = { onToProfile(name to args) }, contentPadding = PaddingValues(0.dp)) {
-                    Text("В профиль…", color = ZapretifyColors.Muted, maxLines = 1)
-                }
-                Spacer(Modifier.weight(1f))
-                if (selected && fixArgs == null) Text("Выбрана", color = ZapretifyColors.Green, fontSize = 13.sp)
-                else TextButton(enabled = enabled, onClick = { apply(row.strategyId, args) }) {
-                    Text(if (fixArgs != null) "Применить с исправлением" else "Применить", maxLines = 1)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(
+                    enabled = enabled, onClick = { onToProfile(name to args) },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), modifier = Modifier.weight(1f),
+                ) { Text("В профиль…", fontSize = 13.sp, maxLines = 1) }
+                if (selected && fixArgs == null) {
+                    OutlinedButton(onClick = {}, enabled = false, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), modifier = Modifier.weight(1f)) {
+                        Text("Выбрана", color = ZapretifyColors.Green, fontSize = 13.sp, maxLines = 1)
+                    }
+                } else {
+                    Button(
+                        enabled = enabled, onClick = { apply(row.strategyId, args) },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), modifier = Modifier.weight(1f),
+                    ) { Text(if (fixArgs != null) "Применить с исправлением" else "Применить", fontSize = 13.sp, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
                 }
             }
         }
@@ -236,10 +243,19 @@ private fun ProfilePickDialog(name: String, args: String, onDismiss: () -> Unit)
                 Spacer(Modifier.height(4.dp))
                 if (profiles.isEmpty()) Text("Профилей пока нет — создайте его в разделе «Профили» кнопкой «+».", fontSize = 13.sp, color = ZapretifyColors.Muted)
                 profiles.forEach { p ->
-                    TextButton(onClick = { ProfileController.setStrategy(p, name, args); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    TextButton(onClick = {
+                        val same = p.strategyArgs == args
+                        ProfileController.setStrategy(p, name, args)
+                        android.widget.Toast.makeText(context,
+                            if (same) "В профиле «${p.name}» уже эта стратегия" else "Записано в профиль «${p.name}»",
+                            android.widget.Toast.LENGTH_SHORT).show()
+                        onDismiss()
+                    }, modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.fillMaxWidth()) {
                             Text(p.name, color = ZapretifyColors.Text, fontWeight = FontWeight.SemiBold)
                             Text(p.networkTitle ?: "Без сети", color = ZapretifyColors.Muted, fontSize = 12.sp)
+                            Text(p.strategyName, color = ZapretifyColors.Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -265,11 +281,11 @@ private fun ChooseRow(note: String, selected: Boolean, enabled: Boolean, strateg
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(note, color = ZapretifyColors.Muted, fontSize = 11.sp, modifier = Modifier.weight(1f))
         if (selected) Text("Выбрана", color = ZapretifyColors.Green, fontSize = 13.sp)
-        else TextButton(enabled = enabled, onClick = {
+        else Button(enabled = enabled, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp), onClick = {
             // Стратегии из набора выбираются по имени; собранная подбором (объединённая) сохраняется как «Своя».
             val known = EngineController.state.value.strategies.firstOrNull { it.id == strategyId }
             if (known != null) EngineController.select(known) else EngineController.setCustom(args)
-        }) { Text("Выбрать") }
+        }) { Text("Выбрать", fontSize = 13.sp) }
     }
 }
 
