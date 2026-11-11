@@ -43,7 +43,7 @@ data class ProfilesState(
 
 /**
  * Профили стратегий по сетям. Профиль создаёт пользователь (название, стратегия, сеть); при смене сети включается
- * стратегия профиля этой сети. Выбор другой стратегии, пока профиль включён, меняет стратегию этого профиля.
+ * стратегия профиля этой сети. Ручной выбор другой стратегии выключает профиль (его стратегия не меняется).
  * Мобильная сеть различается по оператору без разрешений; сети Wi-Fi по названию — только с разрешением на
  * геолокацию (без него все Wi-Fi — одна сеть «Wi-Fi»).
  */
@@ -69,10 +69,17 @@ object ProfileController {
         }
     }
 
-    /** Пользователь выбрал стратегию, пока включён профиль, — это новая стратегия профиля. */
+    /**
+     * Пользователь сам выбрал стратегию в разделе «Стратегии». Профили при этом не меняются: если стратегия есть
+     * в каком-то профиле — включённым считается он, иначе ни один профиль не включён (у всех — «Включить»).
+     */
     private fun onUserChoice(strategy: Strategy) {
-        val active = _state.value.profiles.firstOrNull { it.id == _state.value.activeId } ?: return
-        put(active.copy(strategyName = strategy.name, strategyArgs = strategy.args))
+        val s = _state.value
+        val match = s.profiles.firstOrNull { it.id == s.activeId && it.strategyArgs == strategy.args }
+            ?: s.profiles.firstOrNull { it.networkKey == s.network.key && it.strategyArgs == strategy.args }
+            ?: s.profiles.firstOrNull { it.strategyArgs == strategy.args }
+        _state.update { it.copy(activeId = match?.id) }
+        persist()
     }
 
     /** Создать или сохранить профиль (из окна профиля). Возвращает профиль. */
