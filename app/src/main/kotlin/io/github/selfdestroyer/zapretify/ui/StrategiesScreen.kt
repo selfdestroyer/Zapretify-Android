@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.selfdestroyer.zapretify.engine.EngineController
 import io.github.selfdestroyer.zapretify.engine.Strategy
+import io.github.selfdestroyer.zapretify.profiles.ProfileController
 import io.github.selfdestroyer.zapretify.selection.SelectionController
 import io.github.selfdestroyer.zapretify.selection.SelectionRow
 import io.github.selfdestroyer.zapretify.selection.SelectionState
@@ -50,6 +51,8 @@ fun StrategiesScreen() {
     val engine by EngineController.state.collectAsState()
     val selection by SelectionController.state.collectAsState()
     var customDialog by remember { mutableStateOf(false) }
+    // Стратегия (название и параметры), которую привязывают к профилю; null — окно закрыто.
+    var toProfile by remember { mutableStateOf<Pair<String, String>?>(null) }
     // В итогах — 10 лучших; остальные по кнопке «Показать все».
     var showAll by remember(selection.finishedAt) { mutableStateOf(false) }
     val selectedId = engine.strategy?.id
@@ -72,7 +75,8 @@ fun StrategiesScreen() {
             item { Text("Итоги подбора", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
             val shown = if (showAll || selection.running) selection.rows else selection.rows.take(TOP_RESULTS)
             itemsIndexed(shown, key = { _, r -> "r-" + r.strategyId }) { index, row ->
-                ResultCard(index + 1, row, selected = row.strategyId == selectedId || row.args == selectedArgs, enabled = !selection.running)
+                ResultCard(index + 1, row, selected = row.strategyId == selectedId || row.args == selectedArgs, enabled = !selection.running,
+                    fixArgs = videoFix(row, selection.rows), onToProfile = { toProfile = it })
             }
             if (!showAll && !selection.running && selection.rows.size > TOP_RESULTS) {
                 item {
@@ -89,6 +93,7 @@ fun StrategiesScreen() {
         }
     }
 
+    toProfile?.let { (name, args) -> ProfilePickDialog(name, args, onDismiss = { toProfile = null }) }
     if (customDialog) CustomStrategyDialog(
         current = engine.strategies.firstOrNull { it.id == EngineController.CUSTOM_ID }?.args.orEmpty(),
         onDismiss = { customDialog = false },
@@ -149,8 +154,26 @@ private fun SelectionCard(state: SelectionState, available: Boolean) {
     }
 }
 
+/**
+ * Исправление для видео YouTube: стратегия открывает YouTube, но не сервер видео, а другая стратегия из того же
+ * подбора сервер видео открывает. Тогда для серверов видео (googlevideo.com) берётся приём второй, для всего
+ * остального — эта (группы byedpi с фильтром по домену). Так видео заработало в мобильной сети 11.11.2026.
+ * null — исправление не нужно или не из чего его собрать.
+ */
+private fun videoFix(row: SelectionRow, rows: List<SelectionRow>): String? {
+    if (row.engineFailed || row.video != false || !(row.youtubeSite || row.youtubeApp)) return null
+    if (hasGroups(row.args)) return null
+    val donor = rows.firstOrNull { it.video == true && !it.engineFailed && !hasGroups(it.args) } ?: return null
+    return "-H:$VIDEO_HOSTS ${donor.args} -An ${row.args}"
+}
+
+private const val VIDEO_HOSTS = "googlevideo.com"
+
+private fun hasGroups(args: String) =
+    args.split(' ').any { it.startsWith("-A") || it.startsWith("--auto") || it.startsWith("-H") || it.startsWith("--hosts") }
+
 @Composable
-private fun ResultCard(place: Int, row: SelectionRow, selected: Boolean, enabled: Boolean) {
+private fun ResultCard(place: Int, row: SelectionRow, selected: Boolean, enabled: Boolean, fixArgs: String?, onToProfile: (Pair<String, String>) -> Unit) {
     SectionCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("$place. ${row.name}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -172,12 +195,59 @@ private fun ResultCard(place: Int, row: SelectionRow, selected: Boolean, enabled
             Marks("Discord", listOf("чат" to row.discordChat, "файлы" to row.discordFiles))
             Marks("Telegram", listOf("прокси" to row.telegram))
             if (row.breaksSites) Text("Ломает обычные сайты", color = ZapretifyColors.Red, fontSize = 12.sp)
-            ChooseRow(
-                note = if (row.runs > 1) "Проверена ${row.runs} раза" else "Проверена 1 раз",
-                selected = selected, enabled = enabled, strategyId = row.strategyId, args = row.args,
-            )
+            if (fixArgs != null) {
+                Text("Видео не идёт — есть исправление для сервера видео ($VIDEO_HOSTS).",
+                    color = ZapretifyColors.Amber, fontSize = 12.sp)
+            }
+            Text(if (row.runs > 1) "Проверена ${row.runs} раза" else "Проверена 1 раз", color = ZapretifyColors.Muted, fontSize = 11.sp)
+            // Применяется исправленная стратегия, если исправление есть.
+            val name = if (fixArgs != null) "${row.name} + видео" else row.name
+            val args = fixArgs ?: row.args
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(enabled = enabled, onClick = { onToProfile(name to args) }, contentPadding = PaddingValues(0.dp)) {
+                    Text("В профиль…", color = ZapretifyColors.Muted, maxLines = 1)
+                }
+                Spacer(Modifier.weight(1f))
+                if (selected && fixArgs == null) Text("Выбрана", color = ZapretifyColors.Green, fontSize = 13.sp)
+                else TextButton(enabled = enabled, onClick = { apply(row.strategyId, args) }) {
+                    Text(if (fixArgs != null) "Применить с исправлением" else "Применить", maxLines = 1)
+                }
+            }
         }
     }
+}
+
+/** Стратегии из набора выбираются по имени; исправленная или собранная подбором сохраняется как «Своя». */
+private fun apply(strategyId: String, args: String) {
+    val known = EngineController.state.value.strategies.firstOrNull { it.id == strategyId && it.args == args }
+    if (known != null) EngineController.select(known) else EngineController.setCustom(args)
+}
+
+/** Окно выбора профиля, к которому привязать стратегию. */
+@Composable
+private fun ProfilePickDialog(name: String, args: String, onDismiss: () -> Unit) {
+    val profiles = ProfileController.state.collectAsState().value.profiles
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("В какой профиль?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(args, color = ZapretifyColors.Muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(4.dp))
+                if (profiles.isEmpty()) Text("Профилей пока нет — создайте его в разделе «Профили» кнопкой «+».", fontSize = 13.sp, color = ZapretifyColors.Muted)
+                profiles.forEach { p ->
+                    TextButton(onClick = { ProfileController.setStrategy(p, name, args); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Text(p.name, color = ZapretifyColors.Text, fontWeight = FontWeight.SemiBold)
+                            Text(p.networkTitle ?: "Без сети", color = ZapretifyColors.Muted, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+    )
 }
 
 /** Стратегия из набора, пока подбора не было. */

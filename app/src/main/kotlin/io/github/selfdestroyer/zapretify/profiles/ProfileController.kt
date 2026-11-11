@@ -120,6 +120,13 @@ object ProfileController {
         EngineController.applyArgs(profile.strategyArgs)
     }
 
+    /** Записать стратегию в профиль (из итогов подбора). Если профиль включён — стратегия включается сразу. */
+    fun setStrategy(profile: Profile, name: String, args: String) {
+        val p = profile.copy(strategyName = name, strategyArgs = args)
+        put(p)
+        if (p.id == _state.value.activeId) EngineController.applyArgs(args)
+    }
+
     fun delete(profile: Profile) {
         _state.update { st -> st.copy(profiles = st.profiles.filter { it.id != profile.id }, activeId = st.activeId.takeIf { it != profile.id }) }
         persist()
