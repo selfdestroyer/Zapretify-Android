@@ -83,6 +83,7 @@ fun ProfilesScreen() {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Переключать при смене сети", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                        Text("В сети из профиля сама включается его стратегия.", color = ZapretifyColors.Muted, fontSize = 12.sp)
                     }
                     Switch(checked = state.auto, onCheckedChange = { ProfileController.setAuto(it) })
                 }
@@ -90,7 +91,7 @@ fun ProfilesScreen() {
         }
         if (state.profiles.isEmpty()) {
             item {
-                Text("Нажмите «+», чтобы создать профиль.",
+                Text("Профилей пока нет. Нажмите «+», чтобы создать: например «Дом» для домашнего Wi-Fi и «Мобильный» для мобильного интернета.",
                     color = ZapretifyColors.Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
             }
         }
