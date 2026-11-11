@@ -104,6 +104,7 @@ fun HomeScreen(onOpenStrategies: () -> Unit) {
 
         EngineCard(engine, neverSelected = selection.finishedAt == 0L && !selection.running, onOpenStrategies = onOpenStrategies)
         TelegramCard(proxy, context)
+        Spacer(Modifier.height(BarSpace))
     }
 }
 

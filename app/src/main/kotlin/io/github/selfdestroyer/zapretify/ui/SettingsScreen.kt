@@ -64,5 +64,6 @@ fun SettingsScreen() {
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/selfdestroyer/Zapretify-Android".toUri())) }
             }) { Text("Страница проекта на GitHub") }
         }
+        Spacer(Modifier.height(BarSpace))
     }
 }

@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 object ZapretifyColors {
     val Background = Color(0xFF0B0D13) // --bg
     val Surface = Color(0xFF12141C) // --card
+    val Raised = Color(0xFF1E212F) // --raised: всплывающие панели
     val Indigo = Color(0xFF625BF6) // --indigo
     val Green = Color(0xFF54B279) // --green
     val Amber = Color(0xFFE2A84F) // --amber
