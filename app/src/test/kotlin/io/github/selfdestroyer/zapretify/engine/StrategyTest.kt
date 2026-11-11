@@ -41,5 +41,11 @@ class StrategyTest {
             val args = arr.getJSONObject(i).getString("args")
             assertNull(args, StrategyValidator.check(Strategies.splitArgs(args)))
         }
+        // Набор для подбора: не меньше 30 стратегий, без повторов.
+        val all = (0 until arr.length()).map { arr.getJSONObject(it) }
+        assertEquals(true, all.size >= 30)
+        assertEquals(all.size, all.map { it.getString("id") }.toSet().size)
+        assertEquals(all.size, all.map { it.getString("name") }.toSet().size)
+        assertEquals(all.size, all.map { it.getString("args") }.toSet().size)
     }
 }

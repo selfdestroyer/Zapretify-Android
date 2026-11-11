@@ -162,6 +162,7 @@ private fun EngineCard(engine: EngineState) {
     ServiceCard(title = "YouTube и Discord", status = status, dot = dot)
     var menu by remember { mutableStateOf(false) }
     var customDialog by remember { mutableStateOf(false) }
+    var selection by remember { mutableStateOf(false) }
     Box {
         TextButton(onClick = { menu = true }, enabled = engine.strategies.isNotEmpty()) {
             Text("Стратегия: ${engine.strategy?.name ?: "—"}", color = ZapretifyColors.Muted)
@@ -179,6 +180,10 @@ private fun EngineCard(engine: EngineState) {
             )
         }
     }
+    if (engine.nativeAvailable) TextButton(onClick = { selection = true }) {
+        Text("Подобрать стратегию для этой сети", color = ZapretifyColors.Indigo)
+    }
+    if (selection) SelectionDialog(onDismiss = { selection = false })
     if (customDialog) CustomStrategyDialog(
         current = engine.strategies.firstOrNull { it.id == EngineController.CUSTOM_ID }?.args.orEmpty(),
         onDismiss = { customDialog = false },

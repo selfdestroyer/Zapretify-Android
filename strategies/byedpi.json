@@ -1,12 +1,259 @@
 {
-  "version": 1,
+  "version": 2,
   "engine": "byedpi",
+  "comment": "Набор собран из приёмов по документации byedpi (hufrea/byedpi, MIT) и собственных замеров в трёх сетях. Порядок — по тому, как часто стратегия побеждала в подборе: с первых подбор и начинает.",
   "strategies": [
+    {
+      "id": "r5ps-s25ps",
+      "name": "Разбиение TLS-записи + разбиение (-r5+s -s25+s)",
+      "description": "-r5+s -s25+s",
+      "args": "-r5+s -s25+s"
+    },
+    {
+      "id": "r1ps",
+      "name": "Разбиение TLS-записи (-r1+s)",
+      "description": "-r1+s",
+      "args": "-r1+s"
+    },
+    {
+      "id": "r5ps",
+      "name": "Разбиение TLS-записи (-r5+s)",
+      "description": "-r5+s",
+      "args": "-r5+s"
+    },
+    {
+      "id": "r2ps",
+      "name": "Разбиение TLS-записи (-r2+s)",
+      "description": "-r2+s",
+      "args": "-r2+s"
+    },
     {
       "id": "split-disorder",
       "name": "Разбиение и перестановка",
       "description": "Лучшая по ручной проверке на этапе 0: YouTube с видео, Discord — чат и голос",
       "args": "-d1 -d3+s -s6+s -d9+s -s12+s -d15+s -s20+s -d25+s -s30+s -d35+s -r1+s -S -a1 -As -d1 -d3+s -s6+s -d9+s -s12+s -d15+s -s20+s -d25+s -s30+s -d35+s -S -a1"
+    },
+    {
+      "id": "o1-s1-s5ps-s10ps-s15ps",
+      "name": "Данные вне очереди + разбиение",
+      "description": "-o1 -s1 -s5+s -s10+s -s15+s",
+      "args": "-o1 -s1 -s5+s -s10+s -s15+s"
+    },
+    {
+      "id": "d1-d3ps-s6ps-d9ps-s12ps",
+      "name": "Перестановка + разбиение (-d1 -d3+s -s6+s -d9+s -s12+s)",
+      "description": "-d1 -d3+s -s6+s -d9+s -s12+s",
+      "args": "-d1 -d3+s -s6+s -d9+s -s12+s"
+    },
+    {
+      "id": "q1-s3ps-s6ps-s12ps",
+      "name": "Перестановка с данными вне очереди + разбиение",
+      "description": "-q1 -s3+s -s6+s -s12+s",
+      "args": "-q1 -s3+s -s6+s -s12+s"
+    },
+    {
+      "id": "r1ps-s25ps",
+      "name": "Разбиение TLS-записи + разбиение (-r1+s -s25+s)",
+      "description": "-r1+s -s25+s",
+      "args": "-r1+s -s25+s"
+    },
+    {
+      "id": "r5ps-o25ps",
+      "name": "Разбиение TLS-записи + данные вне очереди (-r5+s -o25+s)",
+      "description": "-r5+s -o25+s",
+      "args": "-r5+s -o25+s"
+    },
+    {
+      "id": "r5ps-s25ps-o1",
+      "name": "Разбиение TLS-записи + разбиение + данные вне очереди",
+      "description": "-r5+s -s25+s -o1",
+      "args": "-r5+s -s25+s -o1"
+    },
+    {
+      "id": "r5ps-s25ps-d1ps",
+      "name": "Разбиение TLS-записи + разбиение + перестановка",
+      "description": "-r5+s -s25+s -d1+s",
+      "args": "-r5+s -s25+s -d1+s"
+    },
+    {
+      "id": "r3ps",
+      "name": "Разбиение TLS-записи (-r3+s)",
+      "description": "-r3+s",
+      "args": "-r3+s"
+    },
+    {
+      "id": "r-1ps",
+      "name": "Разбиение TLS-записи (-r-1+s)",
+      "description": "-r-1+s",
+      "args": "-r-1+s"
+    },
+    {
+      "id": "r1ps-o20psm",
+      "name": "Разбиение TLS-записи + данные вне очереди (-r1+s -o20+sm)",
+      "description": "-r1+s -o20+sm",
+      "args": "-r1+s -o20+sm"
+    },
+    {
+      "id": "r5ps-s25ps-at-r-s-o1-s1-s5ps-s10ps-s15ps",
+      "name": "Разбиение TLS-записи + разбиение + данные вне очереди + запасной приём",
+      "description": "-r5+s -s25+s -At,r,s -o1 -s1 -s5+s -s10+s -s15+s",
+      "args": "-r5+s -s25+s -At,r,s -o1 -s1 -s5+s -s10+s -s15+s"
+    },
+    {
+      "id": "r1ps-at-r-s-d3ps-s25ps",
+      "name": "Разбиение TLS-записи + перестановка + разбиение + запасной приём",
+      "description": "-r1+s -At,r,s -d3+s -s25+s",
+      "args": "-r1+s -At,r,s -d3+s -s25+s"
+    },
+    {
+      "id": "d3ps-at-r-s-r5ps-s25ps",
+      "name": "Перестановка + разбиение TLS-записи + разбиение + запасной приём",
+      "description": "-d3+s -At,r,s -r5+s -s25+s",
+      "args": "-d3+s -At,r,s -r5+s -s25+s"
+    },
+    {
+      "id": "o2-r5ps",
+      "name": "Данные вне очереди + разбиение TLS-записи",
+      "description": "-o2 -r5+s",
+      "args": "-o2 -r5+s"
+    },
+    {
+      "id": "s3ps-r5ps",
+      "name": "Разбиение + разбиение TLS-записи",
+      "description": "-s3+s -r5+s",
+      "args": "-s3+s -r5+s"
+    },
+    {
+      "id": "r5ps-s5ps",
+      "name": "Разбиение TLS-записи + разбиение (-r5+s -s5+s)",
+      "description": "-r5+s -s5+s",
+      "args": "-r5+s -s5+s"
+    },
+    {
+      "id": "r5ps-o1",
+      "name": "Разбиение TLS-записи + данные вне очереди (-r5+s -o1)",
+      "description": "-r5+s -o1",
+      "args": "-r5+s -o1"
+    },
+    {
+      "id": "d3ps",
+      "name": "Перестановка (-d3+s)",
+      "description": "-d3+s",
+      "args": "-d3+s"
+    },
+    {
+      "id": "d1ps",
+      "name": "Перестановка (-d1+s)",
+      "description": "-d1+s",
+      "args": "-d1+s"
+    },
+    {
+      "id": "q1ps",
+      "name": "Перестановка с данными вне очереди (-q1+s)",
+      "description": "-q1+s",
+      "args": "-q1+s"
+    },
+    {
+      "id": "o2",
+      "name": "Данные вне очереди (-o2)",
+      "description": "-o2",
+      "args": "-o2"
+    },
+    {
+      "id": "o1",
+      "name": "Данные вне очереди (-o1)",
+      "description": "-o1",
+      "args": "-o1"
+    },
+    {
+      "id": "r1ps-s1",
+      "name": "Разбиение TLS-записи + разбиение (-r1+s -s1)",
+      "description": "-r1+s -s1",
+      "args": "-r1+s -s1"
+    },
+    {
+      "id": "r1ps-s3ps",
+      "name": "Разбиение TLS-записи + разбиение (-r1+s -s3+s)",
+      "description": "-r1+s -s3+s",
+      "args": "-r1+s -s3+s"
+    },
+    {
+      "id": "r1ps-o1",
+      "name": "Разбиение TLS-записи + данные вне очереди (-r1+s -o1)",
+      "description": "-r1+s -o1",
+      "args": "-r1+s -o1"
+    },
+    {
+      "id": "d3ps-s25ps",
+      "name": "Перестановка + разбиение (-d3+s -s25+s)",
+      "description": "-d3+s -s25+s",
+      "args": "-d3+s -s25+s"
+    },
+    {
+      "id": "d1ps-s3ps",
+      "name": "Перестановка + разбиение (-d1+s -s3+s)",
+      "description": "-d1+s -s3+s",
+      "args": "-d1+s -s3+s"
+    },
+    {
+      "id": "d1ps-d3ps-d6ps-d9ps-d12ps-d15ps",
+      "name": "Перестановка (-d1+s -d3+s -d6+s -d9+s -d…)",
+      "description": "-d1+s -d3+s -d6+s -d9+s -d12+s -d15+s",
+      "args": "-d1+s -d3+s -d6+s -d9+s -d12+s -d15+s"
+    },
+    {
+      "id": "s1ps-s3ps-s6ps-s9ps-s12ps-s15ps-s20ps-s30ps",
+      "name": "Разбиение (-s1+s -s3+s -s6+s -s9+s -s…)",
+      "description": "-s1+s -s3+s -s6+s -s9+s -s12+s -s15+s -s20+s -s30+s",
+      "args": "-s1+s -s3+s -s6+s -s9+s -s12+s -s15+s -s20+s -s30+s"
+    },
+    {
+      "id": "s1-q1-y",
+      "name": "Разбиение + перестановка с данными вне очереди",
+      "description": "-s1 -q1 -Y",
+      "args": "-s1 -q1 -Y"
+    },
+    {
+      "id": "f-1",
+      "name": "Фейковый пакет (-f-1)",
+      "description": "-f-1",
+      "args": "-f-1"
+    },
+    {
+      "id": "f-1-qr",
+      "name": "Фейковый пакет (-f-1 -Qr)",
+      "description": "-f-1 -Qr",
+      "args": "-f-1 -Qr"
+    },
+    {
+      "id": "f-1-t6",
+      "name": "Фейковый пакет (-f-1 -t6)",
+      "description": "-f-1 -t6",
+      "args": "-f-1 -t6"
+    },
+    {
+      "id": "r1ps-f-1-t6",
+      "name": "Разбиение TLS-записи + фейковый пакет",
+      "description": "-r1+s -f-1 -t6",
+      "args": "-r1+s -f-1 -t6"
+    },
+    {
+      "id": "d1-f-1-t6",
+      "name": "Перестановка + фейковый пакет (-d1 -f-1 -t6)",
+      "description": "-d1 -f-1 -t6",
+      "args": "-d1 -f-1 -t6"
+    },
+    {
+      "id": "d1ps-f1-n-google-com-qr",
+      "name": "Перестановка + фейковый пакет (-d1+s -f1 -n \"google.com\" …)",
+      "description": "-d1+s -f1 -n \"google.com\" -Qr",
+      "args": "-d1+s -f1 -n \"google.com\" -Qr"
+    },
+    {
+      "id": "r1ps-mh-s1",
+      "name": "Разбиение TLS-записи + изменение HTTP + разбиение",
+      "description": "-r1+s -Mh -s1",
+      "args": "-r1+s -Mh -s1"
     },
     {
       "id": "readme-disorder-tlsrec",
@@ -19,6 +266,54 @@
       "name": "Фейковый пакет с малым TTL",
       "description": "Пример из документации byedpi (hufrea/byedpi, MIT)",
       "args": "--fake -1 --ttl 8"
+    },
+    {
+      "id": "s1",
+      "name": "Разбиение (-s1)",
+      "description": "-s1",
+      "args": "-s1"
+    },
+    {
+      "id": "s1ps",
+      "name": "Разбиение (-s1+s)",
+      "description": "-s1+s",
+      "args": "-s1+s"
+    },
+    {
+      "id": "s3ps",
+      "name": "Разбиение (-s3+s)",
+      "description": "-s3+s",
+      "args": "-s3+s"
+    },
+    {
+      "id": "s5ps",
+      "name": "Разбиение (-s5+s)",
+      "description": "-s5+s",
+      "args": "-s5+s"
+    },
+    {
+      "id": "d1",
+      "name": "Перестановка (-d1)",
+      "description": "-d1",
+      "args": "-d1"
+    },
+    {
+      "id": "d2",
+      "name": "Перестановка (-d2)",
+      "description": "-d2",
+      "args": "-d2"
+    },
+    {
+      "id": "q1",
+      "name": "Перестановка с данными вне очереди (-q1)",
+      "description": "-q1",
+      "args": "-q1"
+    },
+    {
+      "id": "q2",
+      "name": "Перестановка с данными вне очереди (-q2)",
+      "description": "-q2",
+      "args": "-q2"
     }
   ]
 }
