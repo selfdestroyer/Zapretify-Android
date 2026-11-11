@@ -51,6 +51,7 @@ fun StrategiesScreen() {
     val selection by SelectionController.state.collectAsState()
     var customDialog by remember { mutableStateOf(false) }
     val selectedId = engine.strategy?.id
+    val selectedArgs = engine.strategy?.args
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -68,7 +69,7 @@ fun StrategiesScreen() {
         if (selection.rows.isNotEmpty()) {
             item { Text("Итоги подбора", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
             itemsIndexed(selection.rows, key = { _, r -> "r-" + r.strategyId }) { index, row ->
-                ResultCard(index + 1, row, selected = row.strategyId == selectedId, enabled = !selection.running)
+                ResultCard(index + 1, row, selected = row.strategyId == selectedId || row.args == selectedArgs, enabled = !selection.running)
             }
         } else {
             item { Text("Все стратегии", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
@@ -165,7 +166,7 @@ private fun ResultCard(place: Int, row: SelectionRow, selected: Boolean, enabled
             if (row.breaksSites) Text("Ломает обычные сайты", color = ZapretifyColors.Red, fontSize = 12.sp)
             ChooseRow(
                 note = if (row.runs > 1) "Проверена ${row.runs} раза" else "Проверена 1 раз",
-                selected = selected, enabled = enabled, strategyId = row.strategyId,
+                selected = selected, enabled = enabled, strategyId = row.strategyId, args = row.args,
             )
         }
     }
@@ -177,17 +178,19 @@ private fun PlainCard(strategy: Strategy, selected: Boolean, enabled: Boolean) {
     SectionCard {
         Text(strategy.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Args(strategy.args)
-        ChooseRow(note = "", selected = selected, enabled = enabled, strategyId = strategy.id)
+        ChooseRow(note = "", selected = selected, enabled = enabled, strategyId = strategy.id, args = strategy.args)
     }
 }
 
 @Composable
-private fun ChooseRow(note: String, selected: Boolean, enabled: Boolean, strategyId: String) {
+private fun ChooseRow(note: String, selected: Boolean, enabled: Boolean, strategyId: String, args: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(note, color = ZapretifyColors.Muted, fontSize = 11.sp, modifier = Modifier.weight(1f))
         if (selected) Text("Выбрана", color = ZapretifyColors.Green, fontSize = 13.sp)
         else TextButton(enabled = enabled, onClick = {
-            EngineController.state.value.strategies.firstOrNull { it.id == strategyId }?.let { EngineController.select(it) }
+            // Стратегии из набора выбираются по имени; собранная подбором (объединённая) сохраняется как «Своя».
+            val known = EngineController.state.value.strategies.firstOrNull { it.id == strategyId }
+            if (known != null) EngineController.select(known) else EngineController.setCustom(args)
         }) { Text("Выбрать") }
     }
 }

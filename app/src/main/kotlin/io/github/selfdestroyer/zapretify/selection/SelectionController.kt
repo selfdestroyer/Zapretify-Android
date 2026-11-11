@@ -181,6 +181,23 @@ object SelectionController {
             deadVideo.isNotEmpty() -> add("Сервер видео не отвечает по ${if (deadVideo.first().id == StrategySelector.VIDEO6) "IPv6" else "IPv4"} — видео проверялось по другому протоколу.")
         }
         if (r.unresolved.isNotEmpty()) add("DNS не ответил, не проверялись: ${r.unresolved.joinToString(", ") { it.title }}.")
+        // Что с сервером видео у лучшей стратегии — по каждому протоколу отдельно.
+        r.videoHost?.let { host ->
+            add("Сервер видео этой сети: ${host.removePrefix("rr1---").removeSuffix(".googlevideo.com")}.")
+            val best = r.results.firstOrNull { !it.engineFailed }
+            for (t in r.targets.filter { (it.id == StrategySelector.VIDEO4 || it.id == StrategySelector.VIDEO6) && it.id !in r.unreachable }) {
+                val s = best?.stats?.get(t.id) ?: continue
+                val what = when {
+                    s.ok -> "работает"
+                    s.passed > 0 -> "работает не всегда (${s.passed} из ${s.total})"
+                    s.last == Outcome.NO_TCP -> "нет соединения"
+                    s.last == Outcome.TIMEOUT -> "соединение есть, сервер не отвечает"
+                    s.last == Outcome.RESET -> "соединение сбрасывается"
+                    else -> "приходит не ответ сервера"
+                }
+                add("${t.title} у лучшей стратегии: $what.")
+            }
+        }
         val other = dead.filter { it !in deadVideo }.map { it.title }
         if (other.isNotEmpty()) add("Не удалось даже соединиться (закрыто по адресу или недоступно): ${other.joinToString(", ")}.")
     }

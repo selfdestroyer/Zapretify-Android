@@ -80,13 +80,15 @@ interface SelectionBackend {
  */
 class StrategySelector(
     private val backend: SelectionBackend,
-    private val candidates: List<Candidate>,
+    candidates: List<Candidate>,
     baseTargets: List<Target> = defaultTargets(),
     private val topCount: Int = 5,
     private val extraRuns: Int = 2,
     private val isCancelled: () -> Boolean = { false },
     private val onProgress: (SelectionProgress) -> Unit = {},
 ) {
+    /** Одинаковые параметры (например, своя стратегия совпала со встроенной) проверяются один раз. */
+    private val candidates = candidates.distinctBy { it.args.trim() }.toMutableList()
     private val wanted = baseTargets
     private val targets = mutableListOf<Target>()
     private val unresolved = mutableListOf<Target>()
@@ -97,6 +99,7 @@ class StrategySelector(
     private var baseline: Map<String, TargetStat> = emptyMap()
     private var videoHost: String? = null
     private var videoAttempts = 0
+    private var redirectorAddrs: List<InetAddress> = emptyList()
     private var done = 0
 
     fun run(): SelectionReport {
@@ -130,6 +133,7 @@ class StrategySelector(
                     done++
                 }
             }
+            combineForVideo()
             return report(isCancelled()).also { onProgress(SelectionProgress(done, done, "", it)) }
         } finally {
             pool.shutdownNow()
@@ -150,8 +154,36 @@ class StrategySelector(
             job.cancel(true)
             val ip = (if (t.host.endsWith(".googlevideo.com")) addrs.firstOrNull { it is Inet4Address } else null) ?: addrs.firstOrNull()
             if (ip == null) unresolved += t else targets += t.copy(ip = ip)
+            if (t.id == REDIRECTOR) redirectorAddrs = listOfNotNull(addrs.firstOrNull(), ip).distinct()
         }
     }
+
+    /**
+     * Если лучшая стратегия не открывает сервер видео, а какая-то другая открывает, собирается объединённая:
+     * для серверов видео — приём второй, для всего остального — первая (группы byedpi с фильтром по домену).
+     * Так было в мобильной сети 11.11.2026: видео открывала только перестановка, остальное — разбиение TLS-записи.
+     */
+    private fun combineForVideo() {
+        if (isCancelled()) return
+        val now = report(false)
+        val video = listOf(VIDEO4, VIDEO6).filter { id -> targets.any { it.id == id } && id !in now.unreachable }
+        val best = now.results.firstOrNull { !it.engineFailed && it.score > 0 } ?: return
+        if (video.isEmpty() || video.any { best.ok(it) }) return
+        val donor = now.results.firstOrNull { r -> !r.engineFailed && video.any { r.ok(it) } && !hasGroups(r.candidate.args) } ?: return
+        val combined = Candidate(COMBINED, "Объединённая: для видео свой приём", "-H:googlevideo.com ${donor.candidate.args} -An ${best.candidate.args}")
+        if (candidates.any { it.args == combined.args }) return
+        candidates += combined
+        repeat(1 + extraRuns) {
+            if (isCancelled()) return
+            progress(combined.name)
+            runOnce(combined)
+            done++
+        }
+    }
+
+    /** В параметрах уже есть группы или фильтр доменов — такую стратегию нельзя вставить в группу для видео. */
+    private fun hasGroups(args: String): Boolean =
+        args.split(' ').any { it.startsWith("-A") || it.startsWith("--auto") || it.startsWith("-H") || it.startsWith("--hosts") }
 
     private fun runOnce(c: Candidate) {
         if (!backend.startEngine(c.args)) {
@@ -194,7 +226,10 @@ class StrategySelector(
         // Не больше трёх попыток: каждая неудачная стоит нескольких секунд.
         if (videoHost != null || videoAttempts >= MAX_VIDEO_ATTEMPTS || stats[REDIRECTOR]?.ok != true) return null
         videoAttempts++
-        val cluster = backend.discoverVideoCluster(targets.firstOrNull { it.id == REDIRECTOR }?.ip) ?: return null
+        // Google назначает кластер видео по адресу, с которого пришёл запрос. Приложение YouTube спрашивает его
+        // по адресу, который система выбирает сама (обычно IPv6, если он есть), — спрашиваем так же, иначе получим
+        // кластер, которым YouTube в этой сети не пользуется. Запасной вариант — адрес из проверки (IPv4).
+        val cluster = redirectorAddrs.firstNotNullOfOrNull { backend.discoverVideoCluster(it) } ?: return null
         videoAttempts = MAX_VIDEO_ATTEMPTS
         val host = VideoCluster.hostFor(cluster)
         val addrs = runCatching {
@@ -211,7 +246,7 @@ class StrategySelector(
     }
 
     private fun progress(current: String) {
-        val total = 1 + candidates.size + topCount.coerceAtMost(candidates.size) * extraRuns
+        val total = (1 + candidates.size + topCount.coerceAtMost(candidates.size) * extraRuns).coerceAtLeast(done + 1)
         onProgress(SelectionProgress(done, total, current, report(false)))
     }
 
@@ -244,6 +279,7 @@ class StrategySelector(
         const val VIDEO4 = "yt_video4"
         const val VIDEO6 = "yt_video6"
         const val CONTROL = "control"
+        const val COMBINED = "combined"
         private const val MAX_VIDEO_ATTEMPTS = 3
         private const val RESOLVE_TIMEOUT_MS = 6000L
 

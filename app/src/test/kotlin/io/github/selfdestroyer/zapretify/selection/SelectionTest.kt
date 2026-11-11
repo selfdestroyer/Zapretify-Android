@@ -138,6 +138,28 @@ class SelectionTest {
         assertTrue(report.unresolved.isEmpty())
     }
 
+    /** Лучшая стратегия не открывает видео, другая открывает — подбор собирает объединённую, и она побеждает. */
+    @Test
+    fun combinesAStrategyForVideo() {
+        val video = setOf(StrategySelector.VIDEO4, StrategySelector.VIDEO6)
+        val combined = "-H:googlevideo.com -v -An -a"
+        val backend = FakeBackend(opens = mapOf(
+            "" to setOf(StrategySelector.CONTROL),
+            "-a" to all,
+            "-v" to video + StrategySelector.CONTROL + "yt_api",
+            "-g -At -x" to all + video - "dc_gw" - "dc_web" - "yt_web" - "yt_img" - "tg_cf", // с группами — в объединённую не годится
+            combined to all + video - StrategySelector.REDIRECTOR,
+        ))
+        val cands = listOf(Candidate("a", "a", "-a"), Candidate("g", "g", "-g -At -x"), Candidate("v", "v", "-v"))
+        val report = StrategySelector(backend, cands, StrategySelector.defaultTargets("tg.example"), topCount = 1, extraRuns = 1).run()
+        val first = report.results.first()
+        assertEquals(StrategySelector.COMBINED, first.candidate.id)
+        assertEquals(combined, first.candidate.args)
+        assertEquals(2, first.runs)
+        assertTrue(first.ok(StrategySelector.VIDEO4))
+        assertTrue(first.score > report.results.first { it.candidate.id == "a" }.score)
+    }
+
     @Test
     fun cancelStopsEarly() {
         val backend = FakeBackend(opens = mapOf("-a" to all))
