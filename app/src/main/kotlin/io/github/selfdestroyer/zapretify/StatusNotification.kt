@@ -31,7 +31,7 @@ object StatusNotification {
             listOf("tgproxy", "engine").forEach { runCatching { nm.deleteNotificationChannel(it) } }
         }
         val engineOn = EngineController.state.value.phase != EngineState.Phase.Off
-        val proxyOn = ProxyController.isRunning || ProxyController.settings.enabled
+        val proxyOn = ProxyController.settings.enabled
         val text = when {
             engineOn && proxyOn -> "YouTube, Discord и Telegram"
             engineOn -> "YouTube и Discord"
@@ -57,10 +57,15 @@ object StatusNotification {
         return builder.addAction(0, "Выключить", stopAll).build()
     }
 
-    /** Обновляет текст и кнопки, если уведомление сейчас показано (работает обход или прокси). */
+    /**
+     * Обновляет текст и кнопки или убирает уведомление. Смотрим на то, что пользователь хочет (переключатель),
+     * а не на то, что ещё не успело остановиться: прокси останавливается в отдельном потоке, и проверка «ещё
+     * работает» снова показывала уведомление уже после выключения — его можно было только смахнуть.
+     */
     fun refresh(context: Context) {
         val engineOn = EngineController.state.value.phase != EngineState.Phase.Off
-        if (!engineOn && !ProxyController.isRunning) return
-        runCatching { context.getSystemService(NotificationManager::class.java).notify(ID, build(context)) }
+        val proxyWanted = ProxyController.settings.enabled
+        val nm = context.getSystemService(NotificationManager::class.java)
+        runCatching { if (engineOn || proxyWanted) nm.notify(ID, build(context)) else nm.cancel(ID) }
     }
 }
