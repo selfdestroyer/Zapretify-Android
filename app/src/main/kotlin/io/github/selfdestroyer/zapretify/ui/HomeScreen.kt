@@ -51,6 +51,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import io.github.selfdestroyer.zapretify.engine.EngineController
 import io.github.selfdestroyer.zapretify.engine.EngineState
+import io.github.selfdestroyer.zapretify.profiles.ProfileController
 import io.github.selfdestroyer.zapretify.proxy.ProxyController
 import io.github.selfdestroyer.zapretify.proxy.ProxyState
 import io.github.selfdestroyer.zapretify.selection.SelectionController
@@ -99,11 +100,11 @@ fun HomeScreen(onOpenStrategies: () -> Unit) {
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ScreenTitle("Zapretify", "Android · v$version · предварительная версия")
+        ScreenTitle("Zapretify", "v$version")
 
         MasterCard(on = anyOn, starting = starting, partial = engineDropped, enabled = !selection.running, onToggle = { on -> if (on) turnOn() else turnOff() })
         if (selection.running) {
-            Text("Идёт подбор стратегии — обход включится сам, когда он закончится.", color = ZapretifyColors.Amber, fontSize = 13.sp)
+            Text("Идёт подбор стратегии…", color = ZapretifyColors.Amber, fontSize = 13.sp)
         }
 
         EngineCard(engine, neverSelected = selection.finishedAt == 0L && !selection.running, onOpenStrategies = onOpenStrategies,
@@ -116,10 +117,10 @@ fun HomeScreen(onOpenStrategies: () -> Unit) {
 @Composable
 private fun MasterCard(on: Boolean, starting: Boolean, partial: Boolean, enabled: Boolean, onToggle: (Boolean) -> Unit) {
     val (title, sub, dot) = when {
-        partial -> Triple("Работает частично", "Telegram работает, обход YouTube и Discord остановился", ZapretifyColors.Amber)
-        starting -> Triple("Запуск…", "Включаем обход и Telegram-прокси", ZapretifyColors.Indigo)
-        on -> Triple("Защита включена", "YouTube, Discord и Telegram работают через Zapretify", ZapretifyColors.Green)
-        else -> Triple("Всё выключено", "Один переключатель — обход YouTube и Discord и Telegram-прокси", ZapretifyColors.Muted)
+        partial -> Triple("Работает частично", "Обход YouTube и Discord остановился", ZapretifyColors.Amber)
+        starting -> Triple("Запуск…", "", ZapretifyColors.Indigo)
+        on -> Triple("Включено", "YouTube, Discord, Telegram", ZapretifyColors.Green)
+        else -> Triple("Выключено", "", ZapretifyColors.Muted)
     }
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -134,13 +135,9 @@ private fun MasterCard(on: Boolean, starting: Boolean, partial: Boolean, enabled
                         Spacer(Modifier.width(8.dp))
                         Text(title, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
                     }
-                    Text(sub, color = ZapretifyColors.Muted, fontSize = 13.sp)
+                    if (sub.isNotEmpty()) Text(sub, color = ZapretifyColors.Muted, fontSize = 13.sp)
                 }
                 Switch(checked = on || starting, onCheckedChange = onToggle, enabled = enabled)
-            }
-            if (!on && !starting) {
-                Text("При первом включении Android попросит разрешение на VPN. Другой VPN на телефоне при этом " +
-                    "отключится — одновременно Android держит только один.", color = ZapretifyColors.Muted, fontSize = 12.sp)
             }
         }
     }
@@ -158,19 +155,17 @@ private fun EngineCard(engine: EngineState, neverSelected: Boolean, onOpenStrate
         Text("YouTube и Discord", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
         StatusLine(status, dot)
         Spacer(Modifier.height(8.dp))
-        Text("Стратегия", color = ZapretifyColors.Muted, fontSize = 12.sp)
+        val profiles by ProfileController.state.collectAsState()
+        val profile = profiles.profiles.firstOrNull { it.id == profiles.activeId }
+        Text(if (profile != null) "Профиль «${profile.name}»" else "Стратегия", color = ZapretifyColors.Muted, fontSize = 12.sp)
         Text(engine.strategy?.name ?: "—", fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        if (engine.phase == EngineState.Phase.On && engine.apps.isNotEmpty()) {
-            Spacer(Modifier.height(6.dp))
-            Text("Через обход идут: ${engine.apps.joinToString(", ")}", color = ZapretifyColors.Muted, fontSize = 12.sp)
-        }
         engine.error?.let {
             Spacer(Modifier.height(6.dp))
             Text(it, color = ZapretifyColors.Red, fontSize = 13.sp)
         }
         if (onRestart != null && engine.error == null) {
             Spacer(Modifier.height(6.dp))
-            Text("Обход остановился, YouTube и Discord идут напрямую.", color = ZapretifyColors.Red, fontSize = 13.sp)
+            Text("Обход остановился", color = ZapretifyColors.Red, fontSize = 13.sp)
         }
         if (onRestart != null) {
             Spacer(Modifier.height(8.dp))

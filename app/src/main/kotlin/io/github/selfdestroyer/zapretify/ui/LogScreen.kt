@@ -23,14 +23,20 @@ import io.github.selfdestroyer.zapretify.ui.theme.ZapretifyColors
 
 /** Журнал работы: последние события сверху. Кнопка копирует его целиком — для сообщения об ошибке. */
 @Composable
-fun LogScreen() {
+fun LogScreen(onBack: () -> Unit) {
+    androidx.activity.compose.BackHandler(onBack = onBack)
     val lines = ProxyController.state.collectAsState().value.log
     val context = LocalContext.current
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = BarSpace),
+        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = BarSpace),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        item {
+            androidx.compose.material3.TextButton(onClick = onBack, contentPadding = PaddingValues(0.dp)) {
+                Text("‹ Настройки", color = ZapretifyColors.Indigo)
+            }
+        }
         item { ScreenTitle("Журнал", "Что делало приложение. Новые записи сверху.") }
         if (lines.isEmpty()) {
             item { Text("Пока пусто. Записи появятся, когда вы включите Zapretify.", color = ZapretifyColors.Muted, fontSize = 13.sp) }

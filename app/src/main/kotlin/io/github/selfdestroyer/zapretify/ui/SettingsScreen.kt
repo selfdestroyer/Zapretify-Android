@@ -13,7 +13,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +31,11 @@ import io.github.selfdestroyer.zapretify.vpn.ZapretVpnService
 /** Настройки: Telegram-прокси, приложения, идущие через обход, сведения о программе. */
 @Composable
 fun SettingsScreen() {
+    var showLog by rememberSaveable { mutableStateOf(false) }
+    if (showLog) {
+        LogScreen(onBack = { showLog = false })
+        return
+    }
     val context = LocalContext.current
     val version = remember { appVersion(context) }
     Column(
@@ -37,10 +46,7 @@ fun SettingsScreen() {
 
         SectionCard {
             Text("Telegram-прокси", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Text("Работает на этом телефоне: 127.0.0.1:${ProxyController.settings.port}", color = ZapretifyColors.Muted, fontSize = 13.sp)
-            Spacer(Modifier.height(8.dp))
-            Text("Ключ защищает прокси от чужих программ на телефоне. После смены ключа прокси нужно добавить в Telegram заново.",
-                color = ZapretifyColors.Muted, fontSize = 12.sp)
+            Text("127.0.0.1:${ProxyController.settings.port}", color = ZapretifyColors.Muted, fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = {
                 ProxyController.regenerateSecret()
@@ -51,14 +57,17 @@ fun SettingsScreen() {
         SectionCard {
             Text("Приложения через обход", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Text(ZapretVpnService.DEFAULT_APPS.map { it.second }.distinct().joinToString(", "), color = ZapretifyColors.Muted, fontSize = 13.sp)
-            Spacer(Modifier.height(6.dp))
-            Text("Остальные приложения, в том числе банковские, идут напрямую. Telegram работает через прокси. " +
-                "Выбор приложений появится в следующих версиях.", color = ZapretifyColors.Muted, fontSize = 12.sp)
+        }
+
+        SectionCard {
+            Text("Журнал", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = { showLog = true }) { Text("Открыть журнал") }
         }
 
         SectionCard {
             Text("О программе", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Text("Zapretify для Android · v$version · предварительная версия", color = ZapretifyColors.Muted, fontSize = 13.sp)
+            Text("Zapretify для Android · v$version", color = ZapretifyColors.Muted, fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = {
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "https://github.com/selfdestroyer/Zapretify-Android".toUri())) }

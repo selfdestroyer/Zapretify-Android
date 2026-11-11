@@ -50,6 +50,8 @@ fun StrategiesScreen() {
     val engine by EngineController.state.collectAsState()
     val selection by SelectionController.state.collectAsState()
     var customDialog by remember { mutableStateOf(false) }
+    // В итогах — 10 лучших; остальные по кнопке «Показать все».
+    var showAll by remember(selection.finishedAt) { mutableStateOf(false) }
     val selectedId = engine.strategy?.id
     val selectedArgs = engine.strategy?.args
 
@@ -58,7 +60,7 @@ fun StrategiesScreen() {
         contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = BarSpace),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item { ScreenTitle("Стратегии", "Способ обхода блокировок. В разных сетях работают разные.") }
+        item { ScreenTitle("Стратегии") }
         item { CurrentCard(engine.strategy) }
         item { SelectionCard(selection, available = engine.nativeAvailable) }
         item {
@@ -68,8 +70,16 @@ fun StrategiesScreen() {
         }
         if (selection.rows.isNotEmpty()) {
             item { Text("Итоги подбора", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
-            itemsIndexed(selection.rows, key = { _, r -> "r-" + r.strategyId }) { index, row ->
+            val shown = if (showAll || selection.running) selection.rows else selection.rows.take(TOP_RESULTS)
+            itemsIndexed(shown, key = { _, r -> "r-" + r.strategyId }) { index, row ->
                 ResultCard(index + 1, row, selected = row.strategyId == selectedId || row.args == selectedArgs, enabled = !selection.running)
+            }
+            if (!showAll && !selection.running && selection.rows.size > TOP_RESULTS) {
+                item {
+                    TextButton(onClick = { showAll = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Показать все (${selection.rows.size})", color = ZapretifyColors.Indigo)
+                    }
+                }
             }
         } else {
             item { Text("Все стратегии", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
@@ -84,6 +94,8 @@ fun StrategiesScreen() {
         onDismiss = { customDialog = false },
     )
 }
+
+private const val TOP_RESULTS = 10
 
 @Composable
 private fun CurrentCard(strategy: Strategy?) {
@@ -108,15 +120,11 @@ private fun SelectionCard(state: SelectionState, available: Boolean) {
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
-            Text("Обход на время подбора выключен. Не сворачивайте приложение.", color = ZapretifyColors.Muted, fontSize = 12.sp)
+            Text("Не сворачивайте приложение.", color = ZapretifyColors.Muted, fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = { SelectionController.stop() }) { Text("Остановить") }
         } else {
-            Text(
-                "Zapretify по очереди проверит все стратегии: YouTube, Discord и Telegram. Это займёт несколько минут, " +
-                    "обход на это время выключится.",
-                color = ZapretifyColors.Muted, fontSize = 13.sp,
-            )
+            Text("Проверит все стратегии в этой сети. Около 5 минут.", color = ZapretifyColors.Muted, fontSize = 13.sp)
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Button(onClick = { SelectionController.start(ProxyPaths.cloudflareHost()) }, enabled = available) {
@@ -226,7 +234,7 @@ private fun CustomStrategyDialog(current: String, onDismiss: () -> Unit) {
         title = { Text("Своя стратегия") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Строка параметров byedpi, например лучшая из подбора для вашей сети.", fontSize = 13.sp, color = ZapretifyColors.Muted)
+                Text("Параметры byedpi.", fontSize = 13.sp, color = ZapretifyColors.Muted)
                 OutlinedTextField(
                     value = text, onValueChange = { text = it; error = null },
                     textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 13.sp),

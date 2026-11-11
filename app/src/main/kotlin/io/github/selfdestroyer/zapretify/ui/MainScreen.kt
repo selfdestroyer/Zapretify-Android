@@ -47,8 +47,8 @@ import io.github.selfdestroyer.zapretify.ui.theme.ZapretifyColors
 /** Разделы приложения — кнопки нижней панели. */
 enum class Tab(val title: String, val icon: ImageVector) {
     Home("Главная", NavIcons.Home),
+    Profiles("Профили", NavIcons.Profiles),
     Strategies("Стратегии", NavIcons.Strategies),
-    Log("Журнал", NavIcons.Log),
     Settings("Настройки", NavIcons.Settings),
 }
 
@@ -73,8 +73,8 @@ fun MainScreen() {
         Box(Modifier.fillMaxSize().statusBarsPadding()) {
             when (tab) {
                 Tab.Home -> HomeScreen(onOpenStrategies = { tab = Tab.Strategies })
+                Tab.Profiles -> ProfilesScreen()
                 Tab.Strategies -> StrategiesScreen()
-                Tab.Log -> LogScreen()
                 Tab.Settings -> SettingsScreen()
             }
         }

@@ -55,18 +55,29 @@ object EngineController {
         args?.takeIf { it.isNotBlank() }?.let { Strategy(CUSTOM_ID, "Своя стратегия", it, it) }
 
     /** Своя строка параметров byedpi (например, найденная подбором в другой программе). null — ошибка не найдена. */
-    fun setCustom(args: String): String? {
+    fun setCustom(args: String, byUser: Boolean = true): String? {
         val trimmed = args.trim()
         StrategyValidator.check(Strategies.splitArgs(trimmed))?.let { return it }
         if (trimmed.isEmpty()) return "пустая строка"
         app.getSharedPreferences("engine", Context.MODE_PRIVATE).edit { putString(KEY_CUSTOM, trimmed) }
         val custom = customStrategy(trimmed)!!
         _state.update { s -> s.copy(strategies = s.strategies.filter { it.id != CUSTOM_ID } + custom) }
-        select(custom)
+        select(custom, byUser)
         return null
     }
 
-    fun select(strategy: Strategy) {
+    /** Вызывается, когда пользователь сам выбрал стратегию (профиль сети запоминает выбор). */
+    var onUserChoice: ((Strategy) -> Unit)? = null
+
+    /** Включить стратегию по её параметрам (для профилей): из набора, если такая есть, иначе как «Свою». */
+    fun applyArgs(args: String) {
+        val known = _state.value.strategies.firstOrNull { it.id != CUSTOM_ID && it.args == args }
+        if (known != null) select(known, byUser = false) else setCustom(args, byUser = false)
+    }
+
+    fun select(strategy: Strategy, byUser: Boolean = true) {
+        if (byUser) onUserChoice?.invoke(strategy)
+        if (_state.value.strategy?.args == strategy.args && _state.value.strategy?.id == strategy.id) return
         app.getSharedPreferences("engine", Context.MODE_PRIVATE).edit { putString(KEY_STRATEGY, strategy.id) }
         val wasOn = _state.value.phase != EngineState.Phase.Off
         _state.update { it.copy(strategy = strategy) }
