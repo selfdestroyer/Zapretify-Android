@@ -3,6 +3,14 @@ package io.github.selfdestroyer.zapretify.ui
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
+import io.github.selfdestroyer.zapretify.proxy.ProxyState
+import io.github.selfdestroyer.zapretify.engine.EngineState
+import io.github.selfdestroyer.zapretify.engine.EngineController
+import io.github.selfdestroyer.zapretify.LaunchOptions
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Switch
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +52,8 @@ fun SettingsScreen() {
     ) {
         ScreenTitle("Настройки")
 
+        LaunchCard()
+
         SectionCard {
             Text("Telegram-прокси", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Text("127.0.0.1:${ProxyController.settings.port}", color = ZapretifyColors.Muted, fontSize = 13.sp)
@@ -74,5 +84,44 @@ fun SettingsScreen() {
             }) { Text("Страница проекта на GitHub") }
         }
         Spacer(Modifier.height(BarSpace))
+    }
+}
+
+/** Что включает кнопка на главной. Переключение действует сразу, если Zapretify уже включён. */
+@Composable
+private fun LaunchCard() {
+    val launch by LaunchOptions.state.collectAsState()
+    val context = LocalContext.current
+    val engineOn = EngineController.state.collectAsState().value.phase != EngineState.Phase.Off
+    val proxyOn = ProxyController.state.collectAsState().value.phase != ProxyState.Phase.Off
+    val running = engineOn || proxyOn
+    SectionCard {
+        Text("Что включает кнопка", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        Text("Выключите то, чем не пользуетесь: кнопка на главной будет включать только отмеченное.",
+            color = ZapretifyColors.Muted, fontSize = 12.sp)
+        Spacer(Modifier.height(8.dp))
+        LaunchRow("Обход для YouTube и Discord", "Через VPN на телефоне", launch.bypass, enabled = launch.telegram) { on ->
+            LaunchOptions.set(launch.copy(bypass = on))
+            if (running) {
+                if (!on) EngineController.stop()
+                else if (android.net.VpnService.prepare(context) == null) EngineController.start()
+            }
+        }
+        LaunchRow("Telegram-прокси", "Отдельный движок, без VPN", launch.telegram, enabled = launch.bypass) { on ->
+            LaunchOptions.set(launch.copy(telegram = on))
+            if (running) { if (on) ProxyController.enable() else ProxyController.disable() }
+        }
+    }
+}
+
+@Composable
+private fun LaunchRow(title: String, sub: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 15.sp)
+            Text(sub, color = ZapretifyColors.Muted, fontSize = 12.sp)
+        }
+        // Последний включённый пункт выключить нельзя: кнопке было бы нечего включать.
+        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled || !checked)
     }
 }

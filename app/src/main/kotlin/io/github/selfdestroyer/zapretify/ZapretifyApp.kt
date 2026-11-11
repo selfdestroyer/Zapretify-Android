@@ -10,6 +10,7 @@ import io.github.selfdestroyer.zapretify.selection.SelectionController
 class ZapretifyApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        LaunchOptions.init(this)
         ProxyController.init(this)
         EngineController.init(this)
         SelectionController.init(this)

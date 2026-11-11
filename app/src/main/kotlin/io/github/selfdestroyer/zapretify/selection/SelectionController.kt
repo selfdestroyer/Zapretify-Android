@@ -145,7 +145,10 @@ object SelectionController {
             }
         }
 
-        override fun probe(target: Target, layout: ClientHello.Layout): Outcome = probe.check(target.host, layout, target.ip)
+        private val bulk = BulkProbe(socks)
+        override fun probe(target: Target, layout: ClientHello.Layout): Outcome =
+            if (target.bulkPath != null) bulk.check(target.host, target.bulkPath, target.ip, StrategySelector.BULK_BYTES)
+            else probe.check(target.host, layout, target.ip)
         override fun discoverVideoCluster(redirector: InetAddress?): String? =
             VideoCluster.discover(socks, redirector, onError = { android.util.Log.w("selection", "сервер видео не определён: $it") })
         override fun resolve(host: String): List<InetAddress> = InetAddress.getAllByName(host).toList()
@@ -160,13 +163,17 @@ object SelectionController {
                 youtubeSite = c.ok("yt_web") && c.ok("yt_img"),
                 youtubeApp = c.ok("yt_api"),
                 video = if (videoIds.isEmpty() || videoIds.none { it in c.stats }) null else videoIds.any { c.ok(it) },
-                discordChat = c.ok("dc_web") && c.ok("dc_gw"),
+                // Заморозка после первых килобайт ломает и Discord, и путь Telegram-прокси через Cloudflare.
+                discordChat = c.ok("dc_web") && c.ok("dc_gw") && bulkOk(c),
                 discordFiles = c.ok("dc_cdn") && c.ok("dc_media"),
-                telegram = c.ok("tg_cf"),
+                telegram = c.ok("tg_cf") && bulkOk(c),
                 breaksSites = r.baseline[StrategySelector.CONTROL]?.ok == true && StrategySelector.CONTROL in c.stats && !c.ok(StrategySelector.CONTROL),
             )
         }
     }
+
+    /** Загрузка с Cloudflare не заморожена (или не проверялась). */
+    private fun bulkOk(c: CandidateResult) = c.stats[StrategySelector.CF_BULK]?.let { it.ok } ?: true
 
     private fun notes(r: SelectionReport, finished: Boolean): List<String> = buildList {
         val open = r.targets.filter { r.baseline[it.id]?.ok == true && it.service != Service.CONTROL }.map { it.title }
@@ -196,6 +203,13 @@ object SelectionController {
                     else -> "приходит не ответ сервера"
                 }
                 add("${t.title} у лучшей стратегии: $what.")
+            }
+        }
+        if (finished && r.baseline[StrategySelector.CF_BULK]?.ok == true) {
+            val best = r.results.firstOrNull { !it.engineFailed }
+            if (best != null && best.stats[StrategySelector.CF_BULK]?.ok == false && r.results.none { !it.engineFailed && it.ok(StrategySelector.CF_BULK) && it.ok("dc_gw") }) {
+                add("Провайдер замораживает соединения с Cloudflare после первых ~16 КБ, когда не может прочитать имя сайта. " +
+                    "Discord и путь Telegram-прокси через Cloudflare в этой сети без VPN не заработают; YouTube это не мешает.")
             }
         }
         val other = dead.filter { it !in deadVideo }.map { it.title }

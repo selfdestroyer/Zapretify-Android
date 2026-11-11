@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import io.github.selfdestroyer.zapretify.LaunchOptions
 import io.github.selfdestroyer.zapretify.engine.EngineController
 import io.github.selfdestroyer.zapretify.engine.EngineState
 import io.github.selfdestroyer.zapretify.profiles.ProfileController
@@ -80,8 +81,11 @@ fun HomeScreen(onOpenStrategies: () -> Unit) {
         if (it.resultCode == Activity.RESULT_OK) startEngine()
         else EngineController.reportError("Без разрешения на VPN обход YouTube и Discord не включится")
     }
+    val launch by LaunchOptions.state.collectAsState()
+    // Включается то, что выбрано в «Настройках» → «Что включает кнопка».
     fun startAll() {
-        ProxyController.enable()
+        if (launch.telegram) ProxyController.enable()
+        if (!launch.bypass) return
         val consent = if (engine.nativeAvailable) VpnService.prepare(context) else null
         if (consent != null) askVpn.launch(consent) else startEngine()
     }
@@ -99,8 +103,8 @@ fun HomeScreen(onOpenStrategies: () -> Unit) {
     val anyOn = proxy.phase != ProxyState.Phase.Off || engine.phase != EngineState.Phase.Off
     // Обход включали, а он остановился сам (сбой движка или Android выгрузил приложение и поднял только прокси):
     // Telegram работает, YouTube и Discord — нет.
-    val engineDropped = proxy.phase == ProxyState.Phase.On && engine.phase == EngineState.Phase.Off &&
-        engine.nativeAvailable && engine.wanted
+    val engineDropped = (proxy.phase == ProxyState.Phase.On || !launch.telegram) && engine.phase == EngineState.Phase.Off &&
+        engine.nativeAvailable && engine.wanted && launch.bypass
     val starting = proxy.phase == ProxyState.Phase.Starting || engine.phase == EngineState.Phase.Starting
 
     val profiles by ProfileController.state.collectAsState()
@@ -158,15 +162,16 @@ fun HomeScreen(onOpenStrategies: () -> Unit) {
             else -> Status.OFF
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            ServiceTile("YouTube", engineStatus, Modifier.weight(1f))
-            ServiceTile("Discord", engineStatus, Modifier.weight(1f))
+            val bypassStatus = if (launch.bypass) engineStatus else Status.DISABLED
+            ServiceTile("YouTube", bypassStatus, Modifier.weight(1f))
+            ServiceTile("Discord", bypassStatus, Modifier.weight(1f))
         }
         val tgStatus = when (proxy.phase) {
             ProxyState.Phase.On -> if (proxy.cfBlocked) Status.PARTIAL else Status.WORKS
             ProxyState.Phase.Starting -> Status.STARTING
             ProxyState.Phase.Off -> Status.OFF
         }
-        ServiceTile("Telegram", tgStatus, Modifier.fillMaxWidth()) {
+        ServiceTile("Telegram", if (launch.telegram) tgStatus else Status.DISABLED, Modifier.fillMaxWidth()) {
             if (proxy.phase == ProxyState.Phase.On) {
                 Button(onClick = { openTelegram(context, proxy.link) }) { Text("Перейти в Telegram") }
             }
@@ -205,13 +210,14 @@ private fun PowerButton(state: Power, enabled: Boolean, onClick: () -> Unit) {
 }
 
 private enum class Status(val text: String) {
-    WORKS("Работает"), PARTIAL("Работает частично"), FAILED("Не работает"), STARTING("Запуск…"), OFF("Выключен");
+    WORKS("Работает"), PARTIAL("Работает частично"), FAILED("Не работает"), STARTING("Запуск…"), OFF("Выключен"),
+    DISABLED("Отключён");
     val color: Color get() = when (this) {
         WORKS -> ZapretifyColors.Green
         PARTIAL -> ZapretifyColors.Amber
         FAILED -> ZapretifyColors.Red
         STARTING -> ZapretifyColors.Indigo
-        OFF -> ZapretifyColors.Muted
+        OFF, DISABLED -> ZapretifyColors.Muted
     }
 }
 

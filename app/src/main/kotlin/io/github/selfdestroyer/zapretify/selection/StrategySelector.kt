@@ -16,6 +16,8 @@ data class Target(
     val host: String,
     val ip: InetAddress? = null,
     val weight: Int = 1,
+    /** Для проверки загрузки: путь, по которому скачивается [BULK_BYTES] байт; null — обычная проверка рукопожатия. */
+    val bulkPath: String? = null,
 )
 
 /** Стратегия-кандидат подбора. */
@@ -205,7 +207,9 @@ class StrategySelector(
     /** Один прогон: адрес засчитан, если ответ пришёл при обеих раскладках ClientHello. */
     private fun measure(list: List<Target>): Map<String, TargetStat> {
         val jobs = list.map { t ->
-            t to ClientHello.Layout.entries.map { layout -> pool.submit(Callable { backend.probe(t, layout) }) }
+            // Загрузка проверяется один раз: раскладка ClientHello для неё не важна (TLS — системный).
+            val layouts = if (t.bulkPath != null) listOf(ClientHello.Layout.SNI_FIRST) else ClientHello.Layout.entries
+            t to layouts.map { layout -> pool.submit(Callable { backend.probe(t, layout) }) }
         }
         return jobs.associate { (t, futures) ->
             val outcomes = futures.map { runCatching { it.get() }.getOrDefault(Outcome.BROKEN) }
@@ -280,6 +284,8 @@ class StrategySelector(
         const val VIDEO6 = "yt_video6"
         const val CONTROL = "control"
         const val COMBINED = "combined"
+        const val CF_BULK = "cf_bulk"
+        const val BULK_BYTES = 64 * 1024
         private const val MAX_VIDEO_ATTEMPTS = 3
         private const val RESOLVE_TIMEOUT_MS = 6000L
 
@@ -297,6 +303,9 @@ class StrategySelector(
             Target("dc_cdn", "Файлы Discord", Service.DISCORD, "cdn.discordapp.com"),
             Target("dc_media", "Картинки Discord", Service.DISCORD, "media.discordapp.net"),
             telegramHost?.let { Target("tg_cf", "Telegram-прокси", Service.TELEGRAM, it) },
+            // Не заморожено ли соединение с Cloudflare после первых килобайт (Discord и путь Telegram-прокси).
+            Target(CF_BULK, "Загрузка с Cloudflare", Service.DISCORD, "speed.cloudflare.com", weight = 2,
+                bulkPath = "/__down?bytes=$BULK_BYTES"),
             Target(CONTROL, "Обычные сайты", Service.CONTROL, "ya.ru", weight = 3),
         )
     }
