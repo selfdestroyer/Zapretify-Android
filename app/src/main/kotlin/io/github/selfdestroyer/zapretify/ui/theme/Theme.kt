@@ -5,17 +5,18 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// Цвета из прототипа и десктопной версии: индиго — действия, зелёный — работает,
-// янтарный — внимание, красный — ошибка. Тёмная тема по умолчанию, как на десктопе.
+// Палитра — точно как в версии для Windows и macOS (переменные CSS в её интерфейсе): индиго — действия,
+// зелёный — работает, янтарный — внимание, красный — ошибка. Тёмная тема, как на десктопе.
+// Другие темы (например, Material You) — отдельным переключателем в настройках, позже.
 object ZapretifyColors {
-    val Background = Color(0xFF0B0C12)
-    val Surface = Color(0xFF12131A)
-    val Indigo = Color(0xFF6C5CF0)
-    val Green = Color(0xFF4FD08F)
-    val Amber = Color(0xFFE0A84A)
-    val Red = Color(0xFFDE606E)
-    val Text = Color(0xFFEEF0F6)
-    val Muted = Color(0xFF9095A3)
+    val Background = Color(0xFF0B0D13) // --bg
+    val Surface = Color(0xFF12141C) // --card
+    val Indigo = Color(0xFF625BF6) // --indigo
+    val Green = Color(0xFF54B279) // --green
+    val Amber = Color(0xFFE2A84F) // --amber
+    val Red = Color(0xFFDE606E) // --red
+    val Text = Color(0xFFEEF0F5) // --text
+    val Muted = Color(0xFFA8ADBE) // --text-2: второстепенный текст
 }
 
 private val scheme = darkColorScheme(
