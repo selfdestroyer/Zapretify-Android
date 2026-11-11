@@ -107,7 +107,11 @@ class TgProxyServer(private val log: (String) -> Unit = {}) {
                     try {
                         Session(socket, cfg, upstream, exec, sched, st, wsPool).run()
                     } catch (e: Exception) {
-                        if (running) log("[tg-ws-proxy] [${socket.remoteSocketAddress}] ошибка: $e")
+                        // Соединение прежнего запуска (его пул потоков уже остановлен) ошибкой не считается:
+                        // так бывает при быстром выключении и включении.
+                        if (running && !exec.isShutdown && e !is java.util.concurrent.RejectedExecutionException) {
+                            log("[tg-ws-proxy] [${socket.remoteSocketAddress}] ошибка: $e")
+                        }
                     } finally {
                         runCatching { socket.close() }
                         activeSockets -= socket

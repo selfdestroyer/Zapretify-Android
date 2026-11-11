@@ -1,25 +1,24 @@
 package io.github.selfdestroyer.zapretify.vpn
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
-import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
-import io.github.selfdestroyer.zapretify.MainActivity
-import io.github.selfdestroyer.zapretify.R
+import io.github.selfdestroyer.zapretify.StatusNotification
 import io.github.selfdestroyer.zapretify.engine.EngineController
 import io.github.selfdestroyer.zapretify.engine.NativeBridge
 import io.github.selfdestroyer.zapretify.engine.Strategies
 import io.github.selfdestroyer.zapretify.engine.StrategyValidator
+import io.github.selfdestroyer.zapretify.selection.ClientHello
+import io.github.selfdestroyer.zapretify.selection.Outcome
+import io.github.selfdestroyer.zapretify.selection.TlsProbe
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
 import kotlin.concurrent.thread
 
 /**
@@ -34,6 +33,8 @@ class ZapretVpnService : VpnService() {
     private var byedpiThread: Thread? = null
     private var tunnelThread: Thread? = null
     private val lock = Any()
+    /** Номер запуска движка: наблюдатель прежнего запуска по нему понимает, что он больше не нужен. */
+    @Volatile private var generation = 0
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -42,7 +43,7 @@ class ZapretVpnService : VpnService() {
                 return START_NOT_STICKY
             }
             ACTION_START -> {
-                ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(),
+                ServiceCompat.startForeground(this, StatusNotification.ID, StatusNotification.build(this),
                     if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0)
                 val args = intent.getStringExtra(EXTRA_ARGS).orEmpty()
                 thread(name = "engine-start") { restart(args) }
@@ -67,9 +68,65 @@ class ZapretVpnService : VpnService() {
             val apps = establishTun()
             startByedpi(args)
             startTunnel()
+            val check = selfCheck()
+            if (check == Check.BROKEN) {
+                throw IllegalStateException("с этой стратегией не открываются обычные сайты — выберите другую в разделе «Стратегии»")
+            }
             EngineController.onStarted(apps)
+            if (check == Check.PARTIAL) {
+                EngineController.reportError("С этой стратегией часть обычных сайтов может не открываться. Если заметите — выберите другую.")
+            }
+            watch(generation)
         } catch (e: Exception) {
             shutdown("Не удалось включить обход: ${e.message}")
+        }
+    }
+
+    private enum class Check { OK, PARTIAL, BROKEN }
+
+    /**
+     * Самопроверка после запуска (план, раздел 3.4, пункт 14): открывается ли через движок обычный, никем не
+     * заблокированный сайт. Проверка — тем же большим ClientHello в двух раскладках, что и в подборе.
+     * Если через движок не открывается ничего, а напрямую открывается — стратегия ломает обычные сайты: с ней
+     * браузер в VPN остался бы без интернета, поэтому обход не включается. Если не открывается и напрямую —
+     * интернета сейчас нет, стратегия ни при чём.
+     */
+    private fun selfCheck(): Check {
+        val engine = TlsProbe(InetSocketAddress(EngineController.SOCKS_HOST, EngineController.SOCKS_PORT))
+        val pool = Executors.newFixedThreadPool(CONTROL_HOSTS.size * 2 + 1)
+        try {
+            val viaEngine = CONTROL_HOSTS.flatMap { host -> ClientHello.Layout.entries.map { layout -> pool.submit(Callable { engine.check(host, layout) }) } }
+            val direct = pool.submit(Callable { TlsProbe(null).check(CONTROL_HOSTS.first(), ClientHello.Layout.SNI_FIRST) })
+            val passed = viaEngine.count { runCatching { it.get() }.getOrNull() == Outcome.OK }
+            return when {
+                passed == viaEngine.size -> Check.OK
+                passed > 0 -> Check.PARTIAL
+                runCatching { direct.get() }.getOrNull() == Outcome.OK -> Check.BROKEN
+                else -> Check.OK // интернета нет — не вина стратегии
+            }
+        } finally {
+            pool.shutdownNow()
+        }
+    }
+
+    /**
+     * Следит за движком, пока он работает: если byedpi или туннель завершились сами, VPN снимается — иначе
+     * приложения из списка остались бы «в VPN» без интернета.
+     */
+    private fun watch(gen: Int) {
+        thread(name = "engine-watch", isDaemon = true) {
+            while (true) {
+                Thread.sleep(1000)
+                synchronized(lock) {
+                    if (generation != gen || tun == null) return@thread
+                    val byedpiAlive = byedpiThread?.isAlive == true
+                    val tunnelAlive = tunnelThread?.isAlive == true
+                    if (!byedpiAlive || !tunnelAlive) {
+                        shutdown("Обход остановился сам (${if (!byedpiAlive) "движок" else "туннель"}). Включите его заново.")
+                        return@thread
+                    }
+                }
+            }
         }
     }
 
@@ -118,7 +175,10 @@ class ZapretVpnService : VpnService() {
 
     private fun startTunnel() {
         val fd = tun?.fd ?: throw IllegalStateException("нет TUN")
-        val config = tunnelConfig(java.io.File(cacheDir, "hev.log").absolutePath)
+        // Журнал туннеля не растёт бесконечно: большой файл начинается заново.
+        val logFile = java.io.File(cacheDir, "hev.log")
+        if (logFile.length() > MAX_TUNNEL_LOG) runCatching { logFile.delete() }
+        val config = tunnelConfig(logFile.absolutePath)
         var rc = 0
         val t = thread(name = "tunnel") { rc = NativeBridge.runTunnel(config, fd) }
         tunnelThread = t
@@ -128,6 +188,7 @@ class ZapretVpnService : VpnService() {
     }
 
     private fun stopEngine() {
+        generation++ // наблюдатель прежнего запуска завершится
         if (NativeBridge.available) {
             runCatching { NativeBridge.stopTunnel() }
             runCatching { NativeBridge.stopByedpi() }
@@ -144,33 +205,13 @@ class ZapretVpnService : VpnService() {
         stopSelf()
     }
 
-    private fun buildNotification(): Notification {
-        val nm = getSystemService(NotificationManager::class.java)
-        if (nm.getNotificationChannel(CHANNEL_ID) == null) {
-            nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Обход блокировок", NotificationManager.IMPORTANCE_LOW)
-                .apply { description = "Уведомление, пока работает обход блокировок"; setShowBadge(false) })
-        }
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        val openApp = PendingIntent.getActivity(this, 10, Intent(this, MainActivity::class.java), flags)
-        val stop = PendingIntent.getService(this, 11, Intent(this, ZapretVpnService::class.java).setAction(ACTION_STOP), flags)
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_proxy)
-            .setContentTitle("Обход блокировок работает")
-            .setContentText("YouTube, Discord и браузеры")
-            .setContentIntent(openApp)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .addAction(0, "Выключить", stop)
-            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .build()
-    }
-
     companion object {
         const val ACTION_START = "io.github.selfdestroyer.zapretify.START_ENGINE"
         const val ACTION_STOP = "io.github.selfdestroyer.zapretify.STOP_ENGINE"
         const val EXTRA_ARGS = "args"
-        private const val CHANNEL_ID = "engine"
-        private const val NOTIFICATION_ID = 2
+        private const val MAX_TUNNEL_LOG = 512 * 1024L
+        /** Сайты, которые открыты и без обхода: по ним движок проверяет себя после запуска. */
+        private val CONTROL_HOSTS = listOf("ya.ru", "vk.com")
         private const val MTU = 8500
         private const val TUN_IPV4 = "198.18.0.1"
         private const val TUN_IPV6 = "fc00::1"

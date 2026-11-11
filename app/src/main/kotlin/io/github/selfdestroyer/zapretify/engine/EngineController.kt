@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import io.github.selfdestroyer.zapretify.StatusNotification
 import io.github.selfdestroyer.zapretify.proxy.ProxyController
 import io.github.selfdestroyer.zapretify.vpn.ZapretVpnService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -100,12 +101,14 @@ object EngineController {
     internal fun onStarted(apps: List<String>) {
         _state.update { it.copy(phase = EngineState.Phase.On, apps = apps, error = null) }
         ProxyController.onUpstreamChanged()
+        StatusNotification.refresh(app)
     }
 
     internal fun onStopped(error: String? = null) {
         val was = _state.value.phase
         _state.update { it.copy(phase = EngineState.Phase.Off, apps = emptyList(), error = error) }
         if (was == EngineState.Phase.On) ProxyController.onUpstreamChanged()
+        StatusNotification.refresh(app)
     }
 
     private const val KEY_STRATEGY = "strategy"

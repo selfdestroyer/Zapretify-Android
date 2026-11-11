@@ -3,6 +3,7 @@ package io.github.selfdestroyer.zapretify.proxy
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
+import io.github.selfdestroyer.zapretify.StatusNotification
 import io.github.selfdestroyer.zapretify.engine.EngineController
 import io.github.selfdestroyer.zapretify.tgproxy.ProxyConfig
 import io.github.selfdestroyer.zapretify.tgproxy.TgProxyServer
@@ -77,6 +78,7 @@ object ProxyController {
                 // Пока работает обход, исходящие соединения прокси идут через SOCKS5 byedpi (план, 3.4.3).
                 server.start(ProxyConfig(secretHex = settings.secret, port = settings.port, socks = EngineController.socks))
                 _state.update { it.copy(phase = ProxyState.Phase.On, link = linkFor(), error = null) }
+                StatusNotification.refresh(app)
             } catch (e: Exception) {
                 appendLog("[tg-ws-proxy] Не удалось запустить: $e")
                 _state.update { it.copy(phase = ProxyState.Phase.Off, error = "Не удалось запустить прокси: ${e.message}") }
@@ -88,6 +90,7 @@ object ProxyController {
     internal fun stopServer() {
         thread(name = "tgproxy-stop") { server.stop() }
         _state.update { it.copy(phase = ProxyState.Phase.Off, cfBlocked = false) }
+        StatusNotification.refresh(app)
     }
 
     val isRunning: Boolean get() = server.isRunning

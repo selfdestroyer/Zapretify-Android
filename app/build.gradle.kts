@@ -16,8 +16,8 @@ android {
         applicationId = "io.github.selfdestroyer.zapretify"
         minSdk = 26 // Android 8.0 — предварительно (план, решение 9)
         targetSdk = 37
-        versionCode = 8
-        versionName = "0.3.2"
+        versionCode = 9
+        versionName = "0.3.3"
     }
 
     buildTypes {
