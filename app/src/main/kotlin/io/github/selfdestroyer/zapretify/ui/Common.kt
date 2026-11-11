@@ -62,6 +62,32 @@ internal fun StatusLine(text: String, dot: Color) {
     }
 }
 
+/**
+ * Параметры стратегии. Объединённая стратегия (свой приём для серверов видео) показывается двумя строками —
+ * «Основная» и «Видео YouTube», иначе из длинной строки не видно, что в ней две стратегии и какая где.
+ */
+@Composable
+internal fun StrategyArgs(args: String, maxLines: Int = 2) {
+    val split = splitVideoFix(args)
+    val style = androidx.compose.ui.text.TextStyle(color = ZapretifyColors.Muted, fontSize = 11.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+    if (split == null) {
+        Text(args, style = style, maxLines = maxLines, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+    } else {
+        Text("Основная: ${split.second}", style = style, maxLines = maxLines, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        Text("Видео YouTube: ${split.first}", style = style, maxLines = maxLines, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+    }
+}
+
+/** Объединённая стратегия «-H:googlevideo.com <для видео> -An <основная>» → (для видео, основная); иначе null. */
+internal fun splitVideoFix(args: String): Pair<String, String>? {
+    val prefix = "-H:googlevideo.com "
+    if (!args.startsWith(prefix)) return null
+    val rest = args.removePrefix(prefix)
+    val i = rest.indexOf(" -An ")
+    if (i < 0) return null
+    return rest.substring(0, i).trim() to rest.substring(i + 5).trim()
+}
+
 /** Значки нижней панели (контуры из набора Material Icons, Apache 2.0). */
 internal object NavIcons {
     private fun icon(name: String, path: String): ImageVector =

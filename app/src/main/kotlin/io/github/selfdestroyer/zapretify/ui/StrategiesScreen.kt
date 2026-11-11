@@ -240,7 +240,7 @@ private fun ProfilePickDialog(name: String, args: String, onDismiss: () -> Unit)
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (name.endsWith(" + видео")) Text("С исправлением для видео", color = ZapretifyColors.Amber, fontSize = 12.sp)
-                Text(args, color = ZapretifyColors.Muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                StrategyArgs(args)
                 Spacer(Modifier.height(4.dp))
                 if (profiles.isEmpty()) Text("Профилей пока нет — создайте его в разделе «Профили» кнопкой «+».", fontSize = 13.sp, color = ZapretifyColors.Muted)
                 profiles.forEach { p ->
@@ -295,9 +295,7 @@ private fun ChooseRow(note: String, selected: Boolean, enabled: Boolean, strateg
 }
 
 @Composable
-private fun Args(args: String) {
-    Text(args, color = ZapretifyColors.Muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, maxLines = 2, overflow = TextOverflow.Ellipsis)
-}
+private fun Args(args: String) = StrategyArgs(args)
 
 /** Строка вида «YouTube: сайт ✓ · приложение ✓ · видео ✗»; null — не проверялось. */
 @Composable

@@ -118,7 +118,7 @@ private fun ProfileTile(p: Profile, active: Boolean, here: Boolean, onOpen: () -
                 Text(p.networkTitle ?: "Без сети — включается вручную", color = ZapretifyColors.Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(4.dp))
                 Text(p.strategyName, color = ZapretifyColors.Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(p.strategyArgs, color = ZapretifyColors.Muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                StrategyArgs(p.strategyArgs, maxLines = 1)
             }
             Spacer(Modifier.width(10.dp))
             if (active) {
@@ -184,7 +184,7 @@ private fun ProfileSheet(profile: Profile?, onClose: () -> Unit) {
                         }
                     }
                 }
-                strategy?.let { Text(it.args, color = ZapretifyColors.Muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+                strategy?.let { StrategyArgs(it.args) }
             }
 
             Column {
