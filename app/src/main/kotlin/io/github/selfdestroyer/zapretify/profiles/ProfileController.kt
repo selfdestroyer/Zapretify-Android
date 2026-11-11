@@ -120,11 +120,15 @@ object ProfileController {
         EngineController.applyArgs(profile.strategyArgs)
     }
 
-    /** Записать стратегию в профиль (из итогов подбора). Если профиль включён — стратегия включается сразу. */
+    /**
+     * Записать стратегию в профиль (из итогов подбора). Если профиль включён или это профиль сети, в которой
+     * телефон сейчас, — он включается со стратегией сразу.
+     */
     fun setStrategy(profile: Profile, name: String, args: String) {
         val p = profile.copy(strategyName = name, strategyArgs = args)
         put(p)
-        if (p.id == _state.value.activeId) EngineController.applyArgs(args)
+        val s = _state.value
+        if (p.id == s.activeId || (p.networkKey != null && p.networkKey == s.network.key)) activate(p)
     }
 
     fun delete(profile: Profile) {

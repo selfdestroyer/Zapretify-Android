@@ -239,6 +239,7 @@ private fun ProfilePickDialog(name: String, args: String, onDismiss: () -> Unit)
         title = { Text("В какой профиль?") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (name.endsWith(" + видео")) Text("С исправлением для видео", color = ZapretifyColors.Amber, fontSize = 12.sp)
                 Text(args, color = ZapretifyColors.Muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(4.dp))
                 if (profiles.isEmpty()) Text("Профилей пока нет — создайте его в разделе «Профили» кнопкой «+».", fontSize = 13.sp, color = ZapretifyColors.Muted)
@@ -248,7 +249,11 @@ private fun ProfilePickDialog(name: String, args: String, onDismiss: () -> Unit)
                         val same = p.strategyArgs == args
                         ProfileController.setStrategy(p, name, args)
                         android.widget.Toast.makeText(context,
-                            if (same) "В профиле «${p.name}» уже эта стратегия" else "Записано в профиль «${p.name}»",
+                            when {
+                                same -> "В профиле «${p.name}» уже эта стратегия"
+                                name.endsWith(" + видео") -> "Записано в профиль «${p.name}» с исправлением для видео"
+                                else -> "Записано в профиль «${p.name}»"
+                            },
                             android.widget.Toast.LENGTH_SHORT).show()
                         onDismiss()
                     }, modifier = Modifier.fillMaxWidth()) {
